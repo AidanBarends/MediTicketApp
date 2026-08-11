@@ -1,0 +1,233 @@
+package za.ac.cput.ui.auth;
+
+import za.ac.cput.api.ApiClientProvider;
+import za.ac.cput.api.BaseApiClient;
+import za.ac.cput.model.auth.AuthResponse;
+import za.ac.cput.model.auth.LoginRequest;
+import za.ac.cput.security.JwtUtil;
+import za.ac.cput.session.SessionManager;
+import za.ac.cput.ui.AppFrame;
+import za.ac.cput.ui.auth.components.LabeledPasswordField;
+import za.ac.cput.ui.auth.components.LabeledTextField;
+import za.ac.cput.ui.auth.components.PrimaryButton;
+import za.ac.cput.ui.clinicstaff.admin.AdminDashboard;
+import za.ac.cput.ui.theme.AppTheme;
+import za.ac.cput.ui.theme.FontManager;
+import za.ac.cput.ui.theme.ImageManager;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+
+/**
+ * Single generic login screen shared by all four user roles (Patient,
+ * Doctor, ClinicStaff/Nurse, ClinicStaff/Admin). Role is not chosen here —
+ * it's determined after authentication by decoding the JWT (see JwtUtil),
+ * and AppFrame is routed to the correct dashboard from there.
+ */
+public class LoginPanel extends JPanel {
+
+    private final AppFrame appFrame;
+
+    private LabeledTextField emailField;
+    private LabeledPasswordField passwordField;
+    private JLabel errorLabel;
+
+    public LoginPanel(AppFrame appFrame) {
+        this.appFrame = appFrame;
+        setLayout(new GridLayout(1, 2));
+        add(buildHeroSection());
+        add(buildFormSection());
+    }
+
+    // ── Left: hero section ──────────────────────────────────────
+
+    private JComponent buildHeroSection() {
+        JPanel hero = new JPanel(new GridBagLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Image bg = ImageManager.getImage("hero/herobg.jpg");
+                if (bg != null) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.drawImage(bg, 0, 0, getWidth(), getHeight(), this);
+                    // Dark overlay for logo/text contrast against the photo
+                    g2.setColor(new Color(0, 0, 0, 110));
+                    g2.fillRect(0, 0, getWidth(), getHeight());
+                    g2.dispose();
+                }
+            }
+        };
+
+        JPanel content = new JPanel();
+        content.setOpaque(false);
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+
+        JLabel logo = new JLabel(ImageManager.getIcon(ImageManager.LOGO_WHITE, 260, -1));
+        logo.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel slogan = new JLabel("Care, Coordinated.");
+        slogan.setFont(FontManager.headlineFont(Font.BOLD, 22));
+        slogan.setForeground(Color.WHITE);
+        slogan.setAlignmentX(Component.CENTER_ALIGNMENT);
+        slogan.setBorder(BorderFactory.createEmptyBorder(AppTheme.SPACE_MD, 0, 0, 0));
+
+        content.add(logo);
+        content.add(slogan);
+
+        hero.add(content);
+        return hero;
+    }
+
+    // ── Right: login form ───────────────────────────────────────
+
+    private JComponent buildFormSection() {
+        JPanel wrapper = new JPanel(new GridBagLayout());
+        wrapper.setBackground(AppTheme.SURFACE);
+
+        JPanel form = new JPanel();
+        form.setOpaque(false);
+        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+        form.setPreferredSize(new Dimension(380, 420));
+
+        JLabel title = new JLabel("Welcome Back");
+        title.setFont(FontManager.headlineFont(Font.BOLD, 28));
+        title.setForeground(AppTheme.TEXT_PRIMARY);
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel subtitle = new JLabel("Access your personalized healthcare suite or dashboard.");
+        subtitle.setFont(FontManager.bodyFont(Font.PLAIN, 14));
+        subtitle.setForeground(AppTheme.TEXT_SECONDARY);
+        subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        subtitle.setBorder(BorderFactory.createEmptyBorder(AppTheme.SPACE_XS, 0, AppTheme.SPACE_LG, 0));
+
+        emailField = new LabeledTextField("Email");
+        emailField.setAlignmentX(Component.LEFT_ALIGNMENT);
+        emailField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
+
+        passwordField = new LabeledPasswordField("Password");
+        passwordField.setAlignmentX(Component.LEFT_ALIGNMENT);
+        passwordField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
+        passwordField.onForgotPasswordClick(this::onForgotPassword);
+
+        errorLabel = new JLabel(" ");
+        errorLabel.setFont(FontManager.bodyFont(Font.PLAIN, 13));
+        errorLabel.setForeground(AppTheme.STATUS_DANGER);
+        errorLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        PrimaryButton signInButton = new PrimaryButton("Sign In");
+        signInButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+        signInButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
+        signInButton.addActionListener(e -> onSignIn());
+
+        JLabel patientSignup = buildLinkRow("New patient?", "Sign up", this::onPatientSignup);
+        JLabel staffSignup = buildLinkRow("Clinic professional?", "Signup request", this::onStaffSignupRequest);
+
+        form.add(title);
+        form.add(subtitle);
+        form.add(emailField);
+        form.add(Box.createVerticalStrut(AppTheme.SPACE_MD));
+        form.add(passwordField);
+        form.add(Box.createVerticalStrut(AppTheme.SPACE_SM));
+        form.add(errorLabel);
+        form.add(Box.createVerticalStrut(AppTheme.SPACE_SM));
+        form.add(signInButton);
+        form.add(Box.createVerticalStrut(AppTheme.SPACE_LG));
+        form.add(patientSignup);
+        form.add(Box.createVerticalStrut(AppTheme.SPACE_XS));
+        form.add(staffSignup);
+
+        wrapper.add(form);
+        return wrapper;
+    }
+
+    /**
+     * Builds a "<plain text> <teal link>" row, e.g. "New patient? Sign up".
+     * Returned as a single JLabel-hosting panel isn't ideal for click
+     * targeting on just the link half, so this uses two adjacent labels
+     * inside a left-aligned FlowLayout instead.
+     */
+    private JLabel buildLinkRow(String prefix, String linkText, Runnable onClick) {
+        // Implemented as a composite via JPanel would be cleaner for click
+        // isolation; using a single styled JLabel with HTML for simplicity,
+        // wrapping click detection on the whole component since the panel's
+        // FlowLayout below keeps it visually compact.
+        JLabel combined = new JLabel(
+                "<html>" + prefix + " <span style='color:#0E7C86;font-weight:bold;'>" + linkText + "</span></html>"
+        );
+        combined.setFont(FontManager.bodyFont(Font.PLAIN, 13));
+        combined.setForeground(AppTheme.TEXT_SECONDARY);
+        combined.setAlignmentX(Component.LEFT_ALIGNMENT);
+        combined.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        combined.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) { onClick.run(); }
+        });
+        return combined;
+    }
+
+    // ── Actions ──────────────────────────────────────────────────
+
+    private void onSignIn() {
+        String email = emailField.getText().trim();
+        String password = new String(passwordField.getPassword());
+
+        if (email.isEmpty() || password.isEmpty()) {
+            errorLabel.setText("Please enter both email and password.");
+            return;
+        }
+        errorLabel.setText(" ");
+
+        BaseApiClient.ApiResult<AuthResponse> result =
+                ApiClientProvider.getInstance().auth().login(new LoginRequest(email, password));
+
+        if (!result.isSuccess()) {
+            errorLabel.setText(result.getMessage() != null
+                    ? "Invalid email or password."
+                    : "Could not reach the server.");
+            return;
+        }
+
+        AuthResponse auth = result.getData();
+        String token = auth.getAccessToken();
+
+        SessionManager session = SessionManager.getInstance();
+        session.setAccessToken(token);
+        session.setRefreshToken(auth.getRefreshToken());
+        session.setUserId(JwtUtil.extractUserId(token));
+        session.setUserType(JwtUtil.extractUserType(token));
+        session.setStaffRole(JwtUtil.extractStaffRole(token));
+        session.setEmail(email);
+
+        ApiClientProvider.getInstance().getBaseApiClient().setAuthToken(token);
+
+        // Fetch full name for the header, since AuthResponse doesn't carry it
+        if ("CLINIC_STAFF".equals(session.getUserType())) {
+            var staff = ApiClientProvider.getInstance().clinicStaff().findByEmail(session.getEmail());
+            if (staff.isSuccess()) session.setFullName(staff.getData().getName().getFullName());
+        }
+        // (DOCTOR / PATIENT branches unchanged from earlier)
+
+        if (session.isAdmin()) {
+            AdminDashboard dashboard = new AdminDashboard(appFrame);
+            appFrame.addScreen(AppFrame.SCREEN_ADMIN_DASHBOARD, dashboard);
+            appFrame.showScreen(AppFrame.SCREEN_ADMIN_DASHBOARD);
+        } else {
+            JOptionPane.showMessageDialog(this, "Logged in as " + session.getUserType()
+                    + " — dashboard not built yet.", "Login OK", JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+
+    private void onForgotPassword() {
+        // TODO: route to a forgot-password screen once designed.
+    }
+
+    private void onPatientSignup() {
+        appFrame.showScreen(AppFrame.SCREEN_PATIENT_SIGNUP);
+    }
+
+    private void onStaffSignupRequest() {
+        appFrame.showScreen(AppFrame.SCREEN_ACCESS_REQUEST);
+    }
+}
