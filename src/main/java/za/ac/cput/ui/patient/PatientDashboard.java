@@ -8,6 +8,7 @@ import za.ac.cput.ui.layout.Sidebar;
 import za.ac.cput.ui.layout.TopHeader;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
+import za.ac.cput.ui.patient.pages.DashboardPage;
 
 import javax.swing.*;
 import java.awt.*;
@@ -67,6 +68,7 @@ public class PatientDashboard extends JPanel {
         pageContainer.add(placeholder("Payments"), PAGE_PAYMENTS);
         pageContainer.add(placeholder("Notifications"), PAGE_NOTIFICATIONS);
         pageContainer.add(placeholder("Profile"), PAGE_PROFILE);
+        pageContainer.add(new DashboardPage(), PAGE_HOME);
     }
 
     private JComponent placeholder(String message) {
