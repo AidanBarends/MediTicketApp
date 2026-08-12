@@ -11,6 +11,7 @@ import za.ac.cput.ui.auth.components.LabeledPasswordField;
 import za.ac.cput.ui.auth.components.LabeledTextField;
 import za.ac.cput.ui.auth.components.PrimaryButton;
 import za.ac.cput.ui.clinicstaff.admin.AdminDashboard;
+import za.ac.cput.ui.patient.PatientDashboard;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
 import za.ac.cput.ui.theme.ImageManager;
@@ -149,10 +150,6 @@ public class LoginPanel extends JPanel {
      * inside a left-aligned FlowLayout instead.
      */
     private JLabel buildLinkRow(String prefix, String linkText, Runnable onClick) {
-        // Implemented as a composite via JPanel would be cleaner for click
-        // isolation; using a single styled JLabel with HTML for simplicity,
-        // wrapping click detection on the whole component since the panel's
-        // FlowLayout below keeps it visually compact.
         JLabel combined = new JLabel(
                 "<html>" + prefix + " <span style='color:#0E7C86;font-weight:bold;'>" + linkText + "</span></html>"
         );
@@ -206,13 +203,20 @@ public class LoginPanel extends JPanel {
         if ("CLINIC_STAFF".equals(session.getUserType())) {
             var staff = ApiClientProvider.getInstance().clinicStaff().findByEmail(session.getEmail());
             if (staff.isSuccess()) session.setFullName(staff.getData().getName().getFullName());
+        } else if ("PATIENT".equals(session.getUserType())) {
+            var patient = ApiClientProvider.getInstance().patients().findByEmail(session.getEmail());
+            if (patient.isSuccess()) session.setFullName(patient.getData().getName().getFullName());
         }
-        // (DOCTOR / PATIENT branches unchanged from earlier)
+        // (DOCTOR branch unchanged from earlier)
 
         if (session.isAdmin()) {
             AdminDashboard dashboard = new AdminDashboard(appFrame);
             appFrame.addScreen(AppFrame.SCREEN_ADMIN_DASHBOARD, dashboard);
             appFrame.showScreen(AppFrame.SCREEN_ADMIN_DASHBOARD);
+        } else if ("PATIENT".equals(session.getUserType())) {
+            PatientDashboard dashboard = new PatientDashboard(appFrame);
+            appFrame.addScreen(AppFrame.SCREEN_PATIENT_DASHBOARD, dashboard);
+            appFrame.showScreen(AppFrame.SCREEN_PATIENT_DASHBOARD);
         } else {
             JOptionPane.showMessageDialog(this, "Logged in as " + session.getUserType()
                     + " — dashboard not built yet.", "Login OK", JOptionPane.INFORMATION_MESSAGE);
