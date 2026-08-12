@@ -29,8 +29,10 @@ public class AppFrame extends JFrame {
     public static final String SCREEN_CLINICSTAFF_SIGNUP = "CLINICSTAFF_SIGNUP";
     public static final String SCREEN_EMPLOYEE_SIGNUP_SUCCESS = "EMPLOYEE_SIGNUP_SUCCESS";
     public static final String SCREEN_ADMIN_DASHBOARD = "ADMIN_DASHBOARD";
+    public static final String SCREEN_PATIENT_DASHBOARD = "PATIENT_DASHBOARD";
 
     // CLINIC_STAFF_DASHBOARD, etc.) get added here as those screens are built.
+
 
     private final CardLayout cardLayout;
     private final JPanel contentContainer;
