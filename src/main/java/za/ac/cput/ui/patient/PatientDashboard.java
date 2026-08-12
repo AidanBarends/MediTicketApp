@@ -6,9 +6,10 @@ import za.ac.cput.ui.AppFrame;
 import za.ac.cput.ui.layout.NavItem;
 import za.ac.cput.ui.layout.Sidebar;
 import za.ac.cput.ui.layout.TopHeader;
+import za.ac.cput.ui.patient.pages.AppointmentsPage;
+import za.ac.cput.ui.patient.pages.DashboardPage;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
-import za.ac.cput.ui.patient.pages.DashboardPage;
 
 import javax.swing.*;
 import java.awt.*;
@@ -57,18 +58,17 @@ public class PatientDashboard extends JPanel {
     }
 
     /**
-     * Every page is a placeholder for now. As each real page gets built
-     * (DashboardPage, AppointmentsPage, etc.) we swap its placeholder()
-     * line here for the real class — one line, one step at a time.
+     * Pages are swapped in one at a time as they're built. Home and
+     * Appointments are real now; Tickets/Payments/Notifications/Profile
+     * are still placeholders until their turn.
      */
     private void registerPages() {
-        pageContainer.add(placeholder("Dashboard"), PAGE_HOME);
-        pageContainer.add(placeholder("Appointments"), PAGE_APPOINTMENTS);
+        pageContainer.add(new DashboardPage(), PAGE_HOME);
+        pageContainer.add(new AppointmentsPage(), PAGE_APPOINTMENTS);
         pageContainer.add(placeholder("Tickets"), PAGE_TICKETS);
         pageContainer.add(placeholder("Payments"), PAGE_PAYMENTS);
         pageContainer.add(placeholder("Notifications"), PAGE_NOTIFICATIONS);
         pageContainer.add(placeholder("Profile"), PAGE_PROFILE);
-        pageContainer.add(new DashboardPage(), PAGE_HOME);
     }
 
     private JComponent placeholder(String message) {
