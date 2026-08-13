@@ -6,10 +6,7 @@ import za.ac.cput.ui.AppFrame;
 import za.ac.cput.ui.layout.NavItem;
 import za.ac.cput.ui.layout.Sidebar;
 import za.ac.cput.ui.layout.TopHeader;
-import za.ac.cput.ui.patient.pages.AppointmentsPage;
-import za.ac.cput.ui.patient.pages.DashboardPage;
-import za.ac.cput.ui.patient.pages.PaymentsPage;
-import za.ac.cput.ui.patient.pages.TicketsPage;
+import za.ac.cput.ui.patient.pages.*;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
 
@@ -69,7 +66,7 @@ public class PatientDashboard extends JPanel {
         pageContainer.add(new AppointmentsPage(), PAGE_APPOINTMENTS);
         pageContainer.add(new TicketsPage(), PAGE_TICKETS);
         pageContainer.add(new PaymentsPage(), PAGE_PAYMENTS);
-        pageContainer.add(placeholder("Notifications"), PAGE_NOTIFICATIONS);
+        pageContainer.add(new NotificationsPage(), PAGE_NOTIFICATIONS);
         pageContainer.add(placeholder("Profile"), PAGE_PROFILE);
     }
 
