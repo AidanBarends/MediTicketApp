@@ -3,8 +3,7 @@ package za.ac.cput.ui.clinicstaff.admin.pages;
 import za.ac.cput.api.ApiClientProvider;
 import za.ac.cput.api.BaseApiClient;
 import za.ac.cput.model.domain.Appointment;
-import za.ac.cput.session.SessionManager;
-import za.ac.cput.ui.clinicstaff.admin.components.ApproveAppointmentDialog;
+import za.ac.cput.model.domain.Payment;
 import za.ac.cput.ui.clinicstaff.admin.components.SummaryCard;
 import za.ac.cput.ui.theme.AppDialog;
 import za.ac.cput.ui.theme.AppTheme;
@@ -13,35 +12,31 @@ import za.ac.cput.ui.theme.FontManager;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Shared Appointments page for Admin and Nurse — identical operational
- * access per the appointment workflow doc (review, approve+assign doctor,
- * reject). One class, reused verbatim on the Nurse dashboard once it
- * exists.
- *
- * Approving an appointment automatically creates its PatientTicket
- * server-side (AppointmentService.approveAppointment) — there's no
- * separate "Create Ticket" step here anymore. Completion is likewise
- * automatic: once the doctor resolves the ticket, the linked appointment
- * flips to COMPLETED as a side effect (PatientTicketService), not
- * something clinic staff triggers manually. So a CONFIRMED row has no
- * actions here at all — it's just waiting on the doctor.
+ * Shared Payments page for Admin and Nurse. Payments are generated from
+ * TicketDetailsDialog once a ticket is RESOLVED; this page is where the
+ * clinic-wide payment queue is monitored and where a PENDING payment gets
+ * confirmed as received. Marking PAID here triggers the same backend
+ * auto-close hook as the ticket dialog's "Mark as Paid" — the linked
+ * PatientTicket flips to CLOSED automatically (PaymentService).
  */
-public class AppointmentsPage extends JPanel {
+public class PaymentsPage extends JPanel {
 
-    private SummaryCard pendingCard, confirmedCard, completedCard, cancelledCard;
+    private SummaryCard pendingCard, paidCard, refundedCard, failedCard;
     private JPanel needsAttentionSection;
     private DefaultTableModel tableModel;
-    private JTable appointmentsTable;
+    private JTable paymentsTable;
 
-    private List<Appointment> allAppointments = List.of();
+    private List<Payment> allPayments = List.of();
     private String activeFilter = "ALL";
     private JPanel filterBarContainer;
 
-    public AppointmentsPage() {
+    public PaymentsPage() {
         setLayout(new BorderLayout());
         setBackground(AppTheme.BACKGROUND);
 
@@ -82,12 +77,12 @@ public class AppointmentsPage extends JPanel {
         panel.setOpaque(false);
         panel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel title = new JLabel("Appointments");
+        JLabel title = new JLabel("Payments");
         title.setFont(FontManager.headlineFont(Font.BOLD, 26));
         title.setForeground(AppTheme.TEXT_PRIMARY);
         title.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel subtitle = new JLabel("Review, approve, and manage clinic appointments.");
+        JLabel subtitle = new JLabel("Track and confirm patient payments for completed consultations.");
         subtitle.setFont(FontManager.bodyFont(Font.PLAIN, 14));
         subtitle.setForeground(AppTheme.TEXT_SECONDARY);
         subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -105,14 +100,14 @@ public class AppointmentsPage extends JPanel {
         grid.setMaximumSize(new Dimension(Integer.MAX_VALUE, 100));
 
         pendingCard = new SummaryCard("Pending", "—", AppTheme.STATUS_WARNING);
-        confirmedCard = new SummaryCard("Confirmed", "—", AppTheme.PRIMARY);
-        completedCard = new SummaryCard("Completed", "—", AppTheme.STATUS_SUCCESS);
-        cancelledCard = new SummaryCard("Cancelled", "—", AppTheme.STATUS_DANGER);
+        paidCard = new SummaryCard("Paid", "—", AppTheme.STATUS_SUCCESS);
+        refundedCard = new SummaryCard("Refunded", "—", AppTheme.STATUS_INFO);
+        failedCard = new SummaryCard("Failed", "—", AppTheme.STATUS_DANGER);
 
         grid.add(pendingCard);
-        grid.add(confirmedCard);
-        grid.add(completedCard);
-        grid.add(cancelledCard);
+        grid.add(paidCard);
+        grid.add(refundedCard);
+        grid.add(failedCard);
         return grid;
     }
 
@@ -129,8 +124,8 @@ public class AppointmentsPage extends JPanel {
         bar.setOpaque(false);
 
         String[][] filters = {
-                {"ALL", "All"}, {"PENDING", "Pending"}, {"CONFIRMED", "Confirmed"},
-                {"COMPLETED", "Completed"}, {"CANCELLED", "Cancelled"}, {"RESCHEDULED", "Rescheduled"}
+                {"ALL", "All"}, {"PENDING", "Pending"}, {"PAID", "Paid"},
+                {"REFUNDED", "Refunded"}, {"FAILED", "Failed"}
         };
 
         for (String[] f : filters) {
@@ -155,22 +150,22 @@ public class AppointmentsPage extends JPanel {
     }
 
     private JComponent buildTable() {
-        String[] columns = {"Patient", "Doctor", "Date", "Time", "Status", "Reason", "Action"};
+        String[] columns = {"Patient", "Doctor", "Appointment Date", "Amount", "Method", "Status", "Action"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int col) { return col == 6; }
         };
-        appointmentsTable = new JTable(tableModel);
-        appointmentsTable.setFont(FontManager.bodyFont(Font.PLAIN, 13));
-        appointmentsTable.setRowHeight(40);
-        appointmentsTable.getTableHeader().setFont(FontManager.bodyFont(Font.BOLD, 12));
-        appointmentsTable.setShowGrid(false);
-        appointmentsTable.setIntercellSpacing(new Dimension(0, 0));
-        appointmentsTable.getColumnModel().getColumn(6).setCellRenderer(new ActionCellRenderer());
-        appointmentsTable.getColumnModel().getColumn(6).setCellEditor(new ActionCellEditor());
+        paymentsTable = new JTable(tableModel);
+        paymentsTable.setFont(FontManager.bodyFont(Font.PLAIN, 13));
+        paymentsTable.setRowHeight(40);
+        paymentsTable.getTableHeader().setFont(FontManager.bodyFont(Font.BOLD, 12));
+        paymentsTable.setShowGrid(false);
+        paymentsTable.setIntercellSpacing(new Dimension(0, 0));
+        paymentsTable.getColumnModel().getColumn(6).setCellRenderer(new ActionCellRenderer());
+        paymentsTable.getColumnModel().getColumn(6).setCellEditor(new ActionCellEditor());
 
-        JScrollPane scroll = new JScrollPane(appointmentsTable);
-        scroll.setPreferredSize(new Dimension(0, 360));
+        JScrollPane scroll = new JScrollPane(paymentsTable);
+        scroll.setPreferredSize(new Dimension(0, 380));
         scroll.setBorder(BorderFactory.createLineBorder(AppTheme.DIVIDER));
         scroll.setAlignmentX(Component.LEFT_ALIGNMENT);
         return scroll;
@@ -179,8 +174,8 @@ public class AppointmentsPage extends JPanel {
     // ── Data loading ──────────────────────────────────────────────
 
     private void loadData() {
-        BaseApiClient.ApiResult<List<Appointment>> result = ApiClientProvider.getInstance().appointments().getAll();
-        allAppointments = result.isSuccess() ? result.getData() : List.of();
+        BaseApiClient.ApiResult<List<Payment>> result = ApiClientProvider.getInstance().payments().getAll();
+        allPayments = result.isSuccess() ? result.getData() : List.of();
 
         updateSummaryCards();
         updateNeedsAttention();
@@ -189,13 +184,13 @@ public class AppointmentsPage extends JPanel {
 
     private void updateSummaryCards() {
         pendingCard.setValue(String.valueOf(countByStatus("PENDING")));
-        confirmedCard.setValue(String.valueOf(countByStatus("CONFIRMED")));
-        completedCard.setValue(String.valueOf(countByStatus("COMPLETED")));
-        cancelledCard.setValue(String.valueOf(countByStatus("CANCELLED")));
+        paidCard.setValue(String.valueOf(countByStatus("PAID")));
+        refundedCard.setValue(String.valueOf(countByStatus("REFUNDED")));
+        failedCard.setValue(String.valueOf(countByStatus("FAILED")));
     }
 
     private long countByStatus(String status) {
-        return allAppointments.stream().filter(a -> status.equals(a.getConfirmationStatus())).count();
+        return allPayments.stream().filter(p -> status.equals(p.getPaymentStatus())).count();
     }
 
     private void updateNeedsAttention() {
@@ -208,6 +203,12 @@ public class AppointmentsPage extends JPanel {
             return;
         }
 
+        BigDecimal pendingTotal = allPayments.stream()
+                .filter(p -> "PENDING".equals(p.getPaymentStatus()) && p.getPaymentAmount() != null)
+                .map(Payment::getPaymentAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+
         JLabel title = new JLabel("Needs Attention");
         title.setFont(FontManager.bodyFont(Font.BOLD, 15));
         title.setForeground(AppTheme.TEXT_PRIMARY);
@@ -216,8 +217,8 @@ public class AppointmentsPage extends JPanel {
         needsAttentionSection.add(title);
 
         needsAttentionSection.add(attentionBanner(
-                "\uD83D\uDCC5 " + pending + " appointment" + (pending == 1 ? "" : "s") + " awaiting approval",
-                "New booking requests need review.", "PENDING"));
+                "\uD83D\uDCB3 " + pending + " payment" + (pending == 1 ? "" : "s") + " awaiting confirmation",
+                "R" + pendingTotal + " total outstanding.", "PENDING"));
 
         needsAttentionSection.revalidate();
         needsAttentionSection.repaint();
@@ -248,7 +249,7 @@ public class AppointmentsPage extends JPanel {
         textStack.add(titleLabel);
         textStack.add(subtitleLabel);
 
-        JButton viewButton = new JButton("View Appointments");
+        JButton viewButton = new JButton("View Payments");
         viewButton.setFont(FontManager.bodyFont(Font.BOLD, 12));
         viewButton.setFocusPainted(false);
         viewButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -269,41 +270,50 @@ public class AppointmentsPage extends JPanel {
     private void renderTable() {
         tableModel.setRowCount(0);
 
-        List<Appointment> filtered = "ALL".equals(activeFilter)
-                ? allAppointments
-                : allAppointments.stream().filter(a -> activeFilter.equals(a.getConfirmationStatus())).collect(Collectors.toList());
+        List<Payment> filtered = "ALL".equals(activeFilter)
+                ? allPayments
+                : allPayments.stream().filter(p -> activeFilter.equals(p.getPaymentStatus())).collect(Collectors.toList());
 
-        for (Appointment appt : filtered) {
+        for (Payment payment : filtered) {
             tableModel.addRow(new Object[]{
-                    patientName(appt),
-                    doctorName(appt),
-                    appt.getAppointmentDate() != null ? appt.getAppointmentDate().toString() : "—",
-                    appt.getAppointmentTime() != null ? appt.getAppointmentTime().toString() : "—",
-                    appt.getConfirmationStatus() != null ? appt.getConfirmationStatus() : "—",
-                    appt.getReason() != null && !appt.getReason().isBlank() ? appt.getReason() : "—",
-                    appt.getAppointmentId()
+                    patientName(payment),
+                    doctorName(payment),
+                    appointmentDate(payment),
+                    payment.getPaymentAmount() != null ? "R" + payment.getPaymentAmount().setScale(2, RoundingMode.HALF_UP) : "—",
+                    payment.getPaymentMethod() != null ? payment.getPaymentMethod() : "—",
+                    payment.getPaymentStatus() != null ? payment.getPaymentStatus() : "—",
+                    payment.getPaymentId()
             });
         }
     }
 
-    private String patientName(Appointment appt) {
-        if (appt.getPatient() == null || appt.getPatient().getName() == null) return "—";
+    private String patientName(Payment payment) {
+        Appointment appt = payment.getAppointment();
+        if (appt == null || appt.getPatient() == null || appt.getPatient().getName() == null) return "—";
         String first = appt.getPatient().getName().getFirstName();
         String last = appt.getPatient().getName().getLastName();
         return (first != null ? first : "") + " " + (last != null ? last.charAt(0) + "." : "");
     }
 
-    private String doctorName(Appointment appt) {
-        if (appt.getDoctor() == null || appt.getDoctor().getName() == null) return "Unassigned";
+    private String doctorName(Payment payment) {
+        Appointment appt = payment.getAppointment();
+        if (appt == null || appt.getDoctor() == null || appt.getDoctor().getName() == null) return "—";
         String last = appt.getDoctor().getName().getLastName();
         return "Dr. " + (last != null ? last : "—");
     }
 
-    private Appointment findById(int appointmentId) {
-        return allAppointments.stream().filter(a -> a.getAppointmentId() == appointmentId).findFirst().orElse(null);
+    private String appointmentDate(Payment payment) {
+        Appointment appt = payment.getAppointment();
+        if (appt == null || appt.getAppointmentDate() == null) return "—";
+        return appt.getAppointmentDate().toString();
     }
 
-    // ── Table action column — buttons vary by status ────────────────
+    private Payment findById(int paymentId) {
+        return allPayments.stream().filter(p -> p.getPaymentId() == paymentId).findFirst().orElse(null);
+    }
+
+    // ── Table action column ──────────────────────────────────────
+
     private class ActionCellRenderer extends JPanel implements javax.swing.table.TableCellRenderer {
         ActionCellRenderer() { setLayout(new FlowLayout(FlowLayout.LEFT, 4, 4)); }
 
@@ -312,17 +322,13 @@ public class AppointmentsPage extends JPanel {
                                                        boolean hasFocus, int row, int col) {
             removeAll();
             setBackground(AppTheme.SURFACE);
-            // Guard: row may momentarily be out of range while the model is
-            // being swapped out from under an in-progress repaint (e.g. right
-            // after an action triggers loadData()). Render nothing rather than
-            // crash the EDT.
             if (row < 0 || row >= tableModel.getRowCount()) return this;
 
             Object idValue = tableModel.getValueAt(row, 6);
             if (idValue == null) return this;
 
-            Appointment appt = findById((int) idValue);
-            addButtonsFor(this, appt);
+            Payment payment = findById((int) idValue);
+            addButtonFor(this, payment);
             return this;
         }
     }
@@ -339,8 +345,8 @@ public class AppointmentsPage extends JPanel {
             Object idValue = tableModel.getValueAt(row, 6);
             if (idValue == null) return panel;
 
-            Appointment appt = findById((int) idValue);
-            addButtonsFor(panel, appt, this::fireEditingStopped);
+            Payment payment = findById((int) idValue);
+            addButtonFor(panel, payment, this::fireEditingStopped);
             return panel;
         }
 
@@ -348,30 +354,18 @@ public class AppointmentsPage extends JPanel {
         public Object getCellEditorValue() { return null; }
     }
 
-    private void addButtonsFor(JPanel container, Appointment appt) { addButtonsFor(container, appt, null); }
+    private void addButtonFor(JPanel container, Payment payment) { addButtonFor(container, payment, null); }
 
-    private void addButtonsFor(JPanel container, Appointment appt, Runnable stopEditing) {
-        if (appt == null) return;
-        String status = appt.getConfirmationStatus();
+    private void addButtonFor(JPanel container, Payment payment, Runnable stopEditing) {
+        if (payment == null) return;
 
-        if ("PENDING".equals(status)) {
-            JButton approve = smallButton("Approve", AppTheme.STATUS_SUCCESS);
-            approve.addActionListener(e -> {
+        if ("PENDING".equals(payment.getPaymentStatus())) {
+            JButton markPaid = smallButton("Mark as Paid", AppTheme.STATUS_SUCCESS);
+            markPaid.addActionListener(e -> {
                 if (stopEditing != null) stopEditing.run();
-                SwingUtilities.invokeLater(() -> ApproveAppointmentDialog.show(this, appt, this::loadData));
+                SwingUtilities.invokeLater(() -> markAsPaid(payment));
             });
-            JButton reject = smallButton("Reject", AppTheme.STATUS_DANGER);
-            reject.addActionListener(e -> {
-                if (stopEditing != null) stopEditing.run();
-                SwingUtilities.invokeLater(() -> rejectAppointment(appt));
-            });
-            container.add(approve);
-            container.add(reject);
-        } else if ("CONFIRMED".equals(status)) {
-            JLabel awaitingConsult = new JLabel("Awaiting consultation");
-            awaitingConsult.setFont(FontManager.bodyFont(Font.PLAIN, 12));
-            awaitingConsult.setForeground(AppTheme.TEXT_MUTED);
-            container.add(awaitingConsult);
+            container.add(markPaid);
         } else {
             JLabel none = new JLabel("—");
             none.setFont(FontManager.bodyFont(Font.PLAIN, 12));
@@ -380,19 +374,23 @@ public class AppointmentsPage extends JPanel {
         }
     }
 
-    private void rejectAppointment(Appointment appt) {
-        String reason = JOptionPane.showInputDialog(this, "Reason for rejection (optional):",
-                "Reject Appointment", JOptionPane.PLAIN_MESSAGE);
+    private void markAsPaid(Payment payment) {
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Confirm that payment of R" + (payment.getPaymentAmount() != null
+                        ? payment.getPaymentAmount().setScale(2, RoundingMode.HALF_UP) : "0.00")
+                        + " has been received?",
+                "Mark as Paid", JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) return;
 
-        int staffId = SessionManager.getInstance().getUserId();
-        BaseApiClient.ApiResult<Appointment> result = ApiClientProvider.getInstance()
-                .appointments().reject(appt.getAppointmentId(), staffId, reason);
+        payment.setPaymentStatus("PAID");
+        BaseApiClient.ApiResult<Payment> result = ApiClientProvider.getInstance().payments().update(payment);
 
         if (result.isSuccess()) {
-            AppDialog.show(this, "Appointment Rejected", "The appointment has been rejected.", AppDialog.Type.INFO);
+            AppDialog.show(this, "Payment Confirmed",
+                    "The payment has been marked as paid, and the linked ticket has been closed.", AppDialog.Type.SUCCESS);
             loadData();
         } else {
-            AppDialog.show(this, "Unable to Reject",
+            AppDialog.show(this, "Unable to Update Payment",
                     result.getMessage() != null ? result.getMessage() : "Something went wrong.", AppDialog.Type.ERROR);
         }
     }
