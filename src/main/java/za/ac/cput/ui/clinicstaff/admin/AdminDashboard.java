@@ -27,6 +27,7 @@ public class AdminDashboard extends JPanel {
     private static final String PAGE_TICKETS = "TICKETS";
     private static final String PAGE_REPORTS = "REPORTS";
     private static final String PAGE_NOTIFICATIONS = "NOTIFICATIONS";
+    private static final String PAGE_PAYMENTS = "PAYMENTS";
     private static final String PAGE_PROFILE = "PROFILE";
 
     public AdminDashboard(AppFrame appFrame) {
@@ -42,6 +43,7 @@ public class AdminDashboard extends JPanel {
                 new NavItem(PAGE_TICKETS, "\uD83C\uDFAB", "Tickets"),
                 new NavItem(PAGE_REPORTS, "\uD83D\uDCCA", "Reports"),
                 new NavItem(PAGE_NOTIFICATIONS, "\uD83D\uDD14", "Notifications"),
+                new NavItem(PAGE_PAYMENTS, "\uD83D\uDCB3", "Payments"),
                 new NavItem(PAGE_PROFILE, "\uD83D\uDC64", "Profile")
         );
 
@@ -68,7 +70,8 @@ public class AdminDashboard extends JPanel {
         pageContainer.add(new TicketsPage(), PAGE_TICKETS);
         pageContainer.add(new ReportsPage(), PAGE_REPORTS);
         pageContainer.add(new NotificationsPage(), PAGE_NOTIFICATIONS);
-        pageContainer.add(placeholder("Profile"), PAGE_PROFILE);
+        pageContainer.add(new PaymentsPage(), PAGE_PAYMENTS);
+        pageContainer.add(new ProfilePage(), PAGE_PROFILE);
     }
 
     private JComponent placeholder(String message) {
