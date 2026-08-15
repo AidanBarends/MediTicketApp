@@ -82,8 +82,5 @@ public class AppointmentApiClient {
         return client.post(endpoint.toString(), null, Appointment.class);
     }
 
-    /** Matches AppointmentController#complete — POST /{appointmentId}/complete */
-    public BaseApiClient.ApiResult<Appointment> complete(int appointmentId) {
-        return client.post("/appointment/" + appointmentId + "/complete", null, Appointment.class);
-    }
+
 }
