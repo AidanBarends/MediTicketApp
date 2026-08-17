@@ -34,6 +34,7 @@ public class LoginPanel extends JPanel {
     private LabeledTextField emailField;
     private LabeledPasswordField passwordField;
     private JLabel errorLabel;
+    private PrimaryButton signInButton;
 
     public LoginPanel(AppFrame appFrame) {
         this.appFrame = appFrame;
@@ -117,7 +118,7 @@ public class LoginPanel extends JPanel {
         errorLabel.setForeground(AppTheme.STATUS_DANGER);
         errorLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        PrimaryButton signInButton = new PrimaryButton("Sign In");
+        signInButton = new PrimaryButton("Sign In");
         signInButton.setAlignmentX(Component.LEFT_ALIGNMENT);
         signInButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
         signInButton.addActionListener(e -> onSignIn());
@@ -166,6 +167,15 @@ public class LoginPanel extends JPanel {
 
     // ── Actions ──────────────────────────────────────────────────
 
+    /**
+     * Runs the login HTTP call on a background thread via SwingWorker,
+     * instead of directly on the EDT. Previously this blocked the entire
+     * UI while waiting for the network — the window would appear frozen
+     * with zero visible feedback, and repeated clicks during that freeze
+     * would queue up and fire all at once the moment the first call
+     * finally returned. Disabling the button while a request is in
+     * flight prevents that queuing entirely, on top of fixing the freeze.
+     */
     private void onSignIn() {
         String email = emailField.getText().trim();
         String password = new String(passwordField.getPassword());
@@ -174,11 +184,41 @@ public class LoginPanel extends JPanel {
             errorLabel.setText("Please enter both email and password.");
             return;
         }
+
         errorLabel.setText(" ");
+        signInButton.setEnabled(false);
+        signInButton.setText("Signing In...");
 
-        BaseApiClient.ApiResult<AuthResponse> result =
-                ApiClientProvider.getInstance().auth().login(new LoginRequest(email, password));
+        SwingWorker<BaseApiClient.ApiResult<AuthResponse>, Void> worker =
+                new SwingWorker<>() {
+                    @Override
+                    protected BaseApiClient.ApiResult<AuthResponse> doInBackground() {
+                        // Runs off the EDT — safe to block here.
+                        return ApiClientProvider.getInstance().auth().login(new LoginRequest(email, password));
+                    }
 
+                    @Override
+                    protected void done() {
+                        // Back on the EDT automatically — safe to touch Swing components here.
+                        signInButton.setEnabled(true);
+                        signInButton.setText("Sign In");
+
+                        BaseApiClient.ApiResult<AuthResponse> result;
+                        try {
+                            result = get();
+                        } catch (Exception e) {
+                            errorLabel.setText("Something went wrong. Please try again.");
+                            return;
+                        }
+
+                        handleLoginResult(result, email);
+                    }
+                };
+
+        worker.execute();
+    }
+
+    private void handleLoginResult(BaseApiClient.ApiResult<AuthResponse> result, String email) {
         if (!result.isSuccess()) {
             errorLabel.setText(result.getMessage() != null
                     ? "Invalid email or password."
