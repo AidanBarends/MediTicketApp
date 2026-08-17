@@ -65,7 +65,13 @@ public class DashboardPage extends JPanel {
         SessionManager session = SessionManager.getInstance();
         String firstName = extractFirstName(session.getFullName());
 
-        JLabel greeting = new JLabel(greetingForTime() + ", " + firstName + " \uD83D\uDC4B");
+        // The 👋 emoji has no glyph in our embedded Playfair/Inter fonts, so it's
+        // wrapped in its own HTML span with a system font-family — the rest of
+        // the greeting keeps using the real headline font via setFont() below.
+        JLabel greeting = new JLabel(
+                "<html>" + greetingForTime() + ", " + firstName
+                        + " <span style='font-family:" + Font.SANS_SERIF + ";'>\uD83D\uDC4B</span></html>"
+        );
         greeting.setFont(FontManager.headlineFont(Font.BOLD, 26));
         greeting.setForeground(AppTheme.TEXT_PRIMARY);
         greeting.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -88,14 +94,19 @@ public class DashboardPage extends JPanel {
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
         row.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
 
-        row.add(quickActionButton("\uD83D\uDCC5 Appointment", AppTheme.PRIMARY, AppTheme.TEXT_ON_PRIMARY));
-        row.add(quickActionButton("\uD83C\uDFAB Tickets", AppTheme.SURFACE, AppTheme.TEXT_PRIMARY));
-        row.add(quickActionButton("\uD83D\uDCB3 Payments", AppTheme.ACCENT_DARK, AppTheme.TEXT_ON_PRIMARY));
+        row.add(quickActionButton("\uD83D\uDCC5", "Appointment", AppTheme.PRIMARY, AppTheme.TEXT_ON_PRIMARY));
+        row.add(quickActionButton("\uD83C\uDFAB", "Tickets", AppTheme.SURFACE, AppTheme.TEXT_PRIMARY));
+        row.add(quickActionButton("\uD83D\uDCB3", "Payments", AppTheme.ACCENT_DARK, AppTheme.TEXT_ON_PRIMARY));
         return row;
     }
 
-    private JButton quickActionButton(String text, Color background, Color foreground) {
-        JButton button = new JButton(text) {
+    private JButton quickActionButton(String emoji, String label, Color background, Color foreground) {
+        // Same font-fallback issue as the sidebar and greeting: the emoji is
+        // wrapped in its own HTML span using a system font-family, while the
+        // label text still renders in our real UI font via setFont() below.
+        String html = "<html><span style='font-family:" + Font.SANS_SERIF + ";'>" + emoji + "</span> " + label + "</html>";
+
+        JButton button = new JButton(html) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
