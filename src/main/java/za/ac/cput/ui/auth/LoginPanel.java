@@ -248,6 +248,7 @@ public class LoginPanel extends JPanel {
             if (patient.isSuccess()) session.setFullName(patient.getData().getName().getFullName());
         }
         // (DOCTOR branch unchanged from earlier)
+        // (DOCTOR branch unchanged from earlier)
 
         if (session.isAdmin()) {
             AdminDashboard dashboard = new AdminDashboard(appFrame);
