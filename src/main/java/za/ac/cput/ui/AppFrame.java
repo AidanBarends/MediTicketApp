@@ -1,6 +1,7 @@
 package za.ac.cput.ui;
 
 import za.ac.cput.ui.auth.*;
+import za.ac.cput.ui.auth.*;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.ImageManager;
 
@@ -29,6 +30,11 @@ public class AppFrame extends JFrame {
     public static final String SCREEN_CLINICSTAFF_SIGNUP = "CLINICSTAFF_SIGNUP";
     public static final String SCREEN_EMPLOYEE_SIGNUP_SUCCESS = "EMPLOYEE_SIGNUP_SUCCESS";
     public static final String SCREEN_ADMIN_DASHBOARD = "ADMIN_DASHBOARD";
+    public static final String SCREEN_FORGOT_PASSWORD = "FORGOT_PASSWORD";
+    public static final String SCREEN_VERIFY_RESET_CODE = "VERIFY_RESET_CODE";
+    public static final String SCREEN_NEW_PASSWORD = "NEW_PASSWORD";
+    public static final String SCREEN_DOCTOR_DASHBOARD = "DOCTOR_DASHBOARD";
+    public static final String SCREEN_PATIENT_DASHBOARD = "PATIENT_DASHBOARD";
 
     // CLINIC_STAFF_DASHBOARD, etc.) get added here as those screens are built.
 
@@ -37,6 +43,9 @@ public class AppFrame extends JFrame {
 
     private DoctorSignupPanel doctorSignupPanel;
     private ClinicStaffSignupPanel clinicStaffSignupPanel;
+
+    private VerifyResetCodePanel verifyResetCodePanel;
+    private NewPasswordPanel newPasswordPanel;
 
     public AppFrame() {
         super("MediTicket");
@@ -75,6 +84,13 @@ public class AppFrame extends JFrame {
         contentContainer.add(doctorSignupPanel, SCREEN_DOCTOR_SIGNUP);
         contentContainer.add(clinicStaffSignupPanel, SCREEN_CLINICSTAFF_SIGNUP);
         contentContainer.add(new EmployeeSignupSuccessPanel(this), SCREEN_EMPLOYEE_SIGNUP_SUCCESS);
+
+        contentContainer.add(new ForgotPasswordPanel(this), SCREEN_FORGOT_PASSWORD);
+        verifyResetCodePanel = new VerifyResetCodePanel(this);
+        contentContainer.add(verifyResetCodePanel, SCREEN_VERIFY_RESET_CODE);
+        contentContainer.add(new NewPasswordPanel(this), SCREEN_NEW_PASSWORD);
+        newPasswordPanel = new NewPasswordPanel(this);
+        contentContainer.add(newPasswordPanel, SCREEN_NEW_PASSWORD);
     }
 
     /**
@@ -88,6 +104,8 @@ public class AppFrame extends JFrame {
 
     public DoctorSignupPanel getDoctorSignupPanel() { return doctorSignupPanel; }
     public ClinicStaffSignupPanel getClinicStaffSignupPanel() { return clinicStaffSignupPanel; }
+    public VerifyResetCodePanel getVerifyResetCodePanel() { return verifyResetCodePanel; }
+    public NewPasswordPanel getNewPasswordPanel() { return newPasswordPanel; }
 
     /**
      * Registers a screen built after construction (e.g. a dashboard that

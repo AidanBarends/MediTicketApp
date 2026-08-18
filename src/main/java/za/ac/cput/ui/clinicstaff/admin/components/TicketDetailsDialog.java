@@ -96,7 +96,10 @@ public class TicketDetailsDialog {
             generateButton.setBorderPainted(false);
             generateButton.setAlignmentX(Component.LEFT_ALIGNMENT);
             generateButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            generateButton.addActionListener(e -> generatePayment(dialog, parent, ticket, onChanged));
+            generateButton.addActionListener(e -> {
+                dialog.dispose();
+                GeneratePaymentDialog.show(parent, ticket, onChanged);
+            });
             content.add(generateButton);
         } else {
             JLabel notReady = new JLabel("Payment becomes available once the ticket is resolved.");

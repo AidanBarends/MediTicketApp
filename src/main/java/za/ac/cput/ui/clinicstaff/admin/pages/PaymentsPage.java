@@ -4,8 +4,9 @@ import za.ac.cput.api.ApiClientProvider;
 import za.ac.cput.api.BaseApiClient;
 import za.ac.cput.model.domain.Appointment;
 import za.ac.cput.model.domain.Payment;
+import za.ac.cput.ui.clinicstaff.admin.components.PaymentDetailsDialog;
 import za.ac.cput.ui.clinicstaff.admin.components.SummaryCard;
-import za.ac.cput.ui.theme.AppDialog;
+import za.ac.cput.ui.layout.RowClickHelper;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
 
@@ -18,12 +19,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Shared Payments page for Admin and Nurse. Payments are generated from
- * TicketDetailsDialog once a ticket is RESOLVED; this page is where the
- * clinic-wide payment queue is monitored and where a PENDING payment gets
- * confirmed as received. Marking PAID here triggers the same backend
- * auto-close hook as the ticket dialog's "Mark as Paid" — the linked
- * PatientTicket flips to CLOSED automatically (PaymentService).
+ * Read-only for Admin/Nurse — monitoring only. Payment confirmation is now
+ * entirely the patient's action on their own dashboard; staff can no
+ * longer mark anything paid here. Row click opens a read-only details
+ * dialog (PaymentDetailsDialog).
  */
 public class PaymentsPage extends JPanel {
 
@@ -82,7 +81,7 @@ public class PaymentsPage extends JPanel {
         title.setForeground(AppTheme.TEXT_PRIMARY);
         title.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel subtitle = new JLabel("Track and confirm patient payments for completed consultations.");
+        JLabel subtitle = new JLabel("Monitor patient payments. Click a row to view details.");
         subtitle.setFont(FontManager.bodyFont(Font.PLAIN, 14));
         subtitle.setForeground(AppTheme.TEXT_SECONDARY);
         subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -150,10 +149,10 @@ public class PaymentsPage extends JPanel {
     }
 
     private JComponent buildTable() {
-        String[] columns = {"Patient", "Doctor", "Appointment Date", "Amount", "Method", "Status", "Action"};
+        String[] columns = {"Patient", "Doctor", "Appointment Date", "Amount", "Method", "Status", "ID"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
-            public boolean isCellEditable(int row, int col) { return col == 6; }
+            public boolean isCellEditable(int row, int col) { return false; }
         };
         paymentsTable = new JTable(tableModel);
         paymentsTable.setFont(FontManager.bodyFont(Font.PLAIN, 13));
@@ -161,14 +160,26 @@ public class PaymentsPage extends JPanel {
         paymentsTable.getTableHeader().setFont(FontManager.bodyFont(Font.BOLD, 12));
         paymentsTable.setShowGrid(false);
         paymentsTable.setIntercellSpacing(new Dimension(0, 0));
-        paymentsTable.getColumnModel().getColumn(6).setCellRenderer(new ActionCellRenderer());
-        paymentsTable.getColumnModel().getColumn(6).setCellEditor(new ActionCellEditor());
+        paymentsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        paymentsTable.getColumnModel().getColumn(6).setMinWidth(0);
+        paymentsTable.getColumnModel().getColumn(6).setMaxWidth(0);
+        paymentsTable.getColumnModel().getColumn(6).setWidth(0);
+
+        RowClickHelper.makeRowsClickable(paymentsTable, 6, this::onRowClicked);
 
         JScrollPane scroll = new JScrollPane(paymentsTable);
         scroll.setPreferredSize(new Dimension(0, 380));
         scroll.setBorder(BorderFactory.createLineBorder(AppTheme.DIVIDER));
         scroll.setAlignmentX(Component.LEFT_ALIGNMENT);
         return scroll;
+    }
+
+    private void onRowClicked(int paymentId) {
+        Payment payment = findById(paymentId);
+        if (payment != null) {
+            PaymentDetailsDialog.show(this, payment);
+        }
     }
 
     // ── Data loading ──────────────────────────────────────────────
@@ -217,7 +228,7 @@ public class PaymentsPage extends JPanel {
         needsAttentionSection.add(title);
 
         needsAttentionSection.add(attentionBanner(
-                "\uD83D\uDCB3 " + pending + " payment" + (pending == 1 ? "" : "s") + " awaiting confirmation",
+                "\uD83D\uDCB3 " + pending + " payment" + (pending == 1 ? "" : "s") + " awaiting patient payment",
                 "R" + pendingTotal + " total outstanding.", "PENDING"));
 
         needsAttentionSection.revalidate();
@@ -310,100 +321,5 @@ public class PaymentsPage extends JPanel {
 
     private Payment findById(int paymentId) {
         return allPayments.stream().filter(p -> p.getPaymentId() == paymentId).findFirst().orElse(null);
-    }
-
-    // ── Table action column ──────────────────────────────────────
-
-    private class ActionCellRenderer extends JPanel implements javax.swing.table.TableCellRenderer {
-        ActionCellRenderer() { setLayout(new FlowLayout(FlowLayout.LEFT, 4, 4)); }
-
-        @Override
-        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
-                                                       boolean hasFocus, int row, int col) {
-            removeAll();
-            setBackground(AppTheme.SURFACE);
-            if (row < 0 || row >= tableModel.getRowCount()) return this;
-
-            Object idValue = tableModel.getValueAt(row, 6);
-            if (idValue == null) return this;
-
-            Payment payment = findById((int) idValue);
-            addButtonFor(this, payment);
-            return this;
-        }
-    }
-
-    private class ActionCellEditor extends AbstractCellEditor implements javax.swing.table.TableCellEditor {
-        private final JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
-
-        @Override
-        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int col) {
-            panel.removeAll();
-            panel.setBackground(AppTheme.SURFACE);
-
-            if (row < 0 || row >= tableModel.getRowCount()) return panel;
-            Object idValue = tableModel.getValueAt(row, 6);
-            if (idValue == null) return panel;
-
-            Payment payment = findById((int) idValue);
-            addButtonFor(panel, payment, this::fireEditingStopped);
-            return panel;
-        }
-
-        @Override
-        public Object getCellEditorValue() { return null; }
-    }
-
-    private void addButtonFor(JPanel container, Payment payment) { addButtonFor(container, payment, null); }
-
-    private void addButtonFor(JPanel container, Payment payment, Runnable stopEditing) {
-        if (payment == null) return;
-
-        if ("PENDING".equals(payment.getPaymentStatus())) {
-            JButton markPaid = smallButton("Mark as Paid", AppTheme.STATUS_SUCCESS);
-            markPaid.addActionListener(e -> {
-                if (stopEditing != null) stopEditing.run();
-                SwingUtilities.invokeLater(() -> markAsPaid(payment));
-            });
-            container.add(markPaid);
-        } else {
-            JLabel none = new JLabel("—");
-            none.setFont(FontManager.bodyFont(Font.PLAIN, 12));
-            none.setForeground(AppTheme.TEXT_MUTED);
-            container.add(none);
-        }
-    }
-
-    private void markAsPaid(Payment payment) {
-        int confirm = JOptionPane.showConfirmDialog(this,
-                "Confirm that payment of R" + (payment.getPaymentAmount() != null
-                        ? payment.getPaymentAmount().setScale(2, RoundingMode.HALF_UP) : "0.00")
-                        + " has been received?",
-                "Mark as Paid", JOptionPane.YES_NO_OPTION);
-        if (confirm != JOptionPane.YES_OPTION) return;
-
-        payment.setPaymentStatus("PAID");
-        BaseApiClient.ApiResult<Payment> result = ApiClientProvider.getInstance().payments().update(payment);
-
-        if (result.isSuccess()) {
-            AppDialog.show(this, "Payment Confirmed",
-                    "The payment has been marked as paid, and the linked ticket has been closed.", AppDialog.Type.SUCCESS);
-            loadData();
-        } else {
-            AppDialog.show(this, "Unable to Update Payment",
-                    result.getMessage() != null ? result.getMessage() : "Something went wrong.", AppDialog.Type.ERROR);
-        }
-    }
-
-    private JButton smallButton(String text, Color color) {
-        JButton button = new JButton(text);
-        button.setFont(FontManager.bodyFont(Font.BOLD, 11));
-        button.setForeground(color);
-        button.setBackground(AppTheme.SURFACE);
-        button.setBorder(BorderFactory.createLineBorder(color, 1, true));
-        button.setFocusPainted(false);
-        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        button.setMargin(new Insets(2, 8, 2, 8));
-        return button;
     }
 }

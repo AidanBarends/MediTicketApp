@@ -11,6 +11,8 @@ import za.ac.cput.ui.auth.components.LabeledPasswordField;
 import za.ac.cput.ui.auth.components.LabeledTextField;
 import za.ac.cput.ui.auth.components.PrimaryButton;
 import za.ac.cput.ui.clinicstaff.admin.AdminDashboard;
+import za.ac.cput.ui.doctor.DoctorDashboard;
+import za.ac.cput.ui.patient.PatientDashboard;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
 import za.ac.cput.ui.theme.ImageManager;
@@ -213,14 +215,23 @@ public class LoginPanel extends JPanel {
             AdminDashboard dashboard = new AdminDashboard(appFrame);
             appFrame.addScreen(AppFrame.SCREEN_ADMIN_DASHBOARD, dashboard);
             appFrame.showScreen(AppFrame.SCREEN_ADMIN_DASHBOARD);
+        } else if ("DOCTOR".equals(session.getUserType())) {
+            DoctorDashboard dashboard = new DoctorDashboard(appFrame);
+            appFrame.addScreen(AppFrame.SCREEN_DOCTOR_DASHBOARD, dashboard);
+            appFrame.showScreen(AppFrame.SCREEN_DOCTOR_DASHBOARD);
+        } else if ("PATIENT".equals(session.getUserType())) {
+            PatientDashboard dashboard = new PatientDashboard(appFrame);
+            appFrame.addScreen(AppFrame.SCREEN_PATIENT_DASHBOARD, dashboard);
+            appFrame.showScreen(AppFrame.SCREEN_PATIENT_DASHBOARD);
         } else {
+            // NURSE (CLINIC_STAFF, non-admin) — no dashboard built yet
             JOptionPane.showMessageDialog(this, "Logged in as " + session.getUserType()
                     + " — dashboard not built yet.", "Login OK", JOptionPane.INFORMATION_MESSAGE);
         }
     }
 
     private void onForgotPassword() {
-        // TODO: route to a forgot-password screen once designed.
+        appFrame.showScreen(AppFrame.SCREEN_FORGOT_PASSWORD);
     }
 
     private void onPatientSignup() {
