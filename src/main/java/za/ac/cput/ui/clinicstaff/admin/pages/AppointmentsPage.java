@@ -324,8 +324,17 @@ public class AppointmentsPage extends JPanel {
     }
 
     private void rejectAppointment(Appointment appt) {
-        String reason = JOptionPane.showInputDialog(this, "Reason for rejection (optional):",
+        String reason = JOptionPane.showInputDialog(this, "Reason for rejection (required):",
                 "Reject Appointment", JOptionPane.PLAIN_MESSAGE);
+
+        if (reason == null) {
+            return; // user cancelled — do nothing
+        }
+        if (reason.isBlank()) {
+            AppDialog.show(this, "Reason Required",
+                    "Please provide a reason for rejecting this appointment.", AppDialog.Type.ERROR);
+            return;
+        }
 
         int staffId = SessionManager.getInstance().getUserId();
         BaseApiClient.ApiResult<Appointment> result = ApiClientProvider.getInstance()
