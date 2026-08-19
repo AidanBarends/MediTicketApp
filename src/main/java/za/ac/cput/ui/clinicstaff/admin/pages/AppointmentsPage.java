@@ -5,7 +5,9 @@ import za.ac.cput.api.BaseApiClient;
 import za.ac.cput.model.domain.Appointment;
 import za.ac.cput.session.SessionManager;
 import za.ac.cput.ui.clinicstaff.admin.components.ApproveAppointmentDialog;
+import za.ac.cput.ui.clinicstaff.admin.components.AppointmentDetailsDialog;
 import za.ac.cput.ui.clinicstaff.admin.components.SummaryCard;
+import za.ac.cput.ui.layout.RowClickHelper;
 import za.ac.cput.ui.theme.AppDialog;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
@@ -17,18 +19,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Shared Appointments page for Admin and Nurse — identical operational
- * access per the appointment workflow doc (review, approve+assign doctor,
- * reject). One class, reused verbatim on the Nurse dashboard once it
- * exists.
- *
- * Approving an appointment automatically creates its PatientTicket
- * server-side (AppointmentService.approveAppointment) — there's no
- * separate "Create Ticket" step here anymore. Completion is likewise
- * automatic: once the doctor resolves the ticket, the linked appointment
- * flips to COMPLETED as a side effect (PatientTicketService), not
- * something clinic staff triggers manually. So a CONFIRMED row has no
- * actions here at all — it's just waiting on the doctor.
+ * Row-click pattern: clicking anywhere on a row opens AppointmentDetailsDialog,
+ * which owns the Approve/Reject CTAs (only shown for PENDING rows). No
+ * Action column, no ActionCellRenderer/ActionCellEditor — RowClickHelper
+ * handles the click, the dialog handles the decision.
  */
 public class AppointmentsPage extends JPanel {
 
@@ -87,7 +81,7 @@ public class AppointmentsPage extends JPanel {
         title.setForeground(AppTheme.TEXT_PRIMARY);
         title.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel subtitle = new JLabel("Review, approve, and manage clinic appointments.");
+        JLabel subtitle = new JLabel("Review, approve, and manage clinic appointments. Click a row to view details.");
         subtitle.setFont(FontManager.bodyFont(Font.PLAIN, 14));
         subtitle.setForeground(AppTheme.TEXT_SECONDARY);
         subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -155,10 +149,13 @@ public class AppointmentsPage extends JPanel {
     }
 
     private JComponent buildTable() {
-        String[] columns = {"Patient", "Doctor", "Date", "Time", "Status", "Reason", "Action"};
+        // Status column dropped its own text-badge styling for now — plain
+        // text, same as before. id column (last) stays in the model for
+        // RowClickHelper to read, hidden from view via zero width.
+        String[] columns = {"Patient", "Doctor", "Date", "Time", "Status", "Reason", "ID"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
-            public boolean isCellEditable(int row, int col) { return col == 6; }
+            public boolean isCellEditable(int row, int col) { return false; }
         };
         appointmentsTable = new JTable(tableModel);
         appointmentsTable.setFont(FontManager.bodyFont(Font.PLAIN, 13));
@@ -166,14 +163,37 @@ public class AppointmentsPage extends JPanel {
         appointmentsTable.getTableHeader().setFont(FontManager.bodyFont(Font.BOLD, 12));
         appointmentsTable.setShowGrid(false);
         appointmentsTable.setIntercellSpacing(new Dimension(0, 0));
-        appointmentsTable.getColumnModel().getColumn(6).setCellRenderer(new ActionCellRenderer());
-        appointmentsTable.getColumnModel().getColumn(6).setCellEditor(new ActionCellEditor());
+        appointmentsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        // Hide the ID column visually without removing it from the model
+        appointmentsTable.getColumnModel().getColumn(6).setMinWidth(0);
+        appointmentsTable.getColumnModel().getColumn(6).setMaxWidth(0);
+        appointmentsTable.getColumnModel().getColumn(6).setWidth(0);
+
+        RowClickHelper.makeRowsClickable(appointmentsTable, 6, this::onRowClicked);
 
         JScrollPane scroll = new JScrollPane(appointmentsTable);
-        scroll.setPreferredSize(new Dimension(0, 360));
+        scroll.setPreferredSize(new Dimension(0, 380));
         scroll.setBorder(BorderFactory.createLineBorder(AppTheme.DIVIDER));
         scroll.setAlignmentX(Component.LEFT_ALIGNMENT);
         return scroll;
+    }
+
+    private void onRowClicked(int appointmentId) {
+        Appointment appt = findById(appointmentId);
+        if (appt == null) return;
+
+        AppointmentDetailsDialog.show(this, appt, new AppointmentDetailsDialog.ActionCallback() {
+            @Override
+            public void onApprove() {
+                ApproveAppointmentDialog.show(AppointmentsPage.this, appt, AppointmentsPage.this::loadData);
+            }
+
+            @Override
+            public void onReject() {
+                rejectAppointment(appt);
+            }
+        });
     }
 
     // ── Data loading ──────────────────────────────────────────────
@@ -303,86 +323,18 @@ public class AppointmentsPage extends JPanel {
         return allAppointments.stream().filter(a -> a.getAppointmentId() == appointmentId).findFirst().orElse(null);
     }
 
-    // ── Table action column — buttons vary by status ────────────────
-    private class ActionCellRenderer extends JPanel implements javax.swing.table.TableCellRenderer {
-        ActionCellRenderer() { setLayout(new FlowLayout(FlowLayout.LEFT, 4, 4)); }
-
-        @Override
-        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
-                                                       boolean hasFocus, int row, int col) {
-            removeAll();
-            setBackground(AppTheme.SURFACE);
-            // Guard: row may momentarily be out of range while the model is
-            // being swapped out from under an in-progress repaint (e.g. right
-            // after an action triggers loadData()). Render nothing rather than
-            // crash the EDT.
-            if (row < 0 || row >= tableModel.getRowCount()) return this;
-
-            Object idValue = tableModel.getValueAt(row, 6);
-            if (idValue == null) return this;
-
-            Appointment appt = findById((int) idValue);
-            addButtonsFor(this, appt);
-            return this;
-        }
-    }
-
-    private class ActionCellEditor extends AbstractCellEditor implements javax.swing.table.TableCellEditor {
-        private final JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
-
-        @Override
-        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int col) {
-            panel.removeAll();
-            panel.setBackground(AppTheme.SURFACE);
-
-            if (row < 0 || row >= tableModel.getRowCount()) return panel;
-            Object idValue = tableModel.getValueAt(row, 6);
-            if (idValue == null) return panel;
-
-            Appointment appt = findById((int) idValue);
-            addButtonsFor(panel, appt, this::fireEditingStopped);
-            return panel;
-        }
-
-        @Override
-        public Object getCellEditorValue() { return null; }
-    }
-
-    private void addButtonsFor(JPanel container, Appointment appt) { addButtonsFor(container, appt, null); }
-
-    private void addButtonsFor(JPanel container, Appointment appt, Runnable stopEditing) {
-        if (appt == null) return;
-        String status = appt.getConfirmationStatus();
-
-        if ("PENDING".equals(status)) {
-            JButton approve = smallButton("Approve", AppTheme.STATUS_SUCCESS);
-            approve.addActionListener(e -> {
-                if (stopEditing != null) stopEditing.run();
-                SwingUtilities.invokeLater(() -> ApproveAppointmentDialog.show(this, appt, this::loadData));
-            });
-            JButton reject = smallButton("Reject", AppTheme.STATUS_DANGER);
-            reject.addActionListener(e -> {
-                if (stopEditing != null) stopEditing.run();
-                SwingUtilities.invokeLater(() -> rejectAppointment(appt));
-            });
-            container.add(approve);
-            container.add(reject);
-        } else if ("CONFIRMED".equals(status)) {
-            JLabel awaitingConsult = new JLabel("Awaiting consultation");
-            awaitingConsult.setFont(FontManager.bodyFont(Font.PLAIN, 12));
-            awaitingConsult.setForeground(AppTheme.TEXT_MUTED);
-            container.add(awaitingConsult);
-        } else {
-            JLabel none = new JLabel("—");
-            none.setFont(FontManager.bodyFont(Font.PLAIN, 12));
-            none.setForeground(AppTheme.TEXT_MUTED);
-            container.add(none);
-        }
-    }
-
     private void rejectAppointment(Appointment appt) {
-        String reason = JOptionPane.showInputDialog(this, "Reason for rejection (optional):",
+        String reason = JOptionPane.showInputDialog(this, "Reason for rejection (required):",
                 "Reject Appointment", JOptionPane.PLAIN_MESSAGE);
+
+        if (reason == null) {
+            return; // user cancelled — do nothing
+        }
+        if (reason.isBlank()) {
+            AppDialog.show(this, "Reason Required",
+                    "Please provide a reason for rejecting this appointment.", AppDialog.Type.ERROR);
+            return;
+        }
 
         int staffId = SessionManager.getInstance().getUserId();
         BaseApiClient.ApiResult<Appointment> result = ApiClientProvider.getInstance()
@@ -395,17 +347,5 @@ public class AppointmentsPage extends JPanel {
             AppDialog.show(this, "Unable to Reject",
                     result.getMessage() != null ? result.getMessage() : "Something went wrong.", AppDialog.Type.ERROR);
         }
-    }
-
-    private JButton smallButton(String text, Color color) {
-        JButton button = new JButton(text);
-        button.setFont(FontManager.bodyFont(Font.BOLD, 11));
-        button.setForeground(color);
-        button.setBackground(AppTheme.SURFACE);
-        button.setBorder(BorderFactory.createLineBorder(color, 1, true));
-        button.setFocusPainted(false);
-        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        button.setMargin(new Insets(2, 8, 2, 8));
-        return button;
     }
 }

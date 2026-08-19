@@ -2,30 +2,36 @@ package za.ac.cput.ui.patient.pages;
 
 import za.ac.cput.api.ApiClientProvider;
 import za.ac.cput.api.BaseApiClient;
+import za.ac.cput.model.domain.Appointment;
 import za.ac.cput.model.domain.Payment;
 import za.ac.cput.session.SessionManager;
-import za.ac.cput.ui.patient.components.StatusBadge;
-import za.ac.cput.ui.theme.AppDialog;
+import za.ac.cput.ui.patient.components.FakeCheckoutDialog;
+import za.ac.cput.ui.layout.RowClickHelper;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
+import java.math.RoundingMode;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * PaymentApiClient has no findByPatient(id) endpoint yet, so this filters
- * client-side from getAll(). Fine for a small dataset; a real
- * GET /payments/patient/{id} endpoint would be a better long-term fix if
- * the payment list ever grows large.
+ * No findByPatient endpoint exists on PaymentApiClient, so payments are
+ * loaded via getAll() and filtered client-side to those whose
+ * appointment.patient.userId matches the logged-in patient — same
+ * pattern as Doctor's Tickets page. Clicking a PENDING row opens the fake
+ * checkout flow; clicking anything else just shows a read-only receipt.
  */
 public class PaymentsPage extends JPanel {
 
-    private JPanel listContainer;
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMM d, yyyy");
-    private static final String[] PAY_METHODS = {"CARD", "EFT", "CASH", "MEDICAL_AID"};
+    private DefaultTableModel tableModel;
+    private JTable paymentsTable;
+
+    private List<Payment> myPayments = List.of();
+    private String activeFilter = "ALL";
+    private JPanel filterBarContainer;
 
     public PaymentsPage() {
         setLayout(new BorderLayout());
@@ -39,11 +45,15 @@ public class PaymentsPage extends JPanel {
         content.add(buildHeader());
         content.add(Box.createVerticalStrut(AppTheme.SPACE_LG));
 
-        listContainer = new JPanel();
-        listContainer.setLayout(new BoxLayout(listContainer, BoxLayout.Y_AXIS));
-        listContainer.setOpaque(false);
-        listContainer.setAlignmentX(Component.LEFT_ALIGNMENT);
-        content.add(listContainer);
+        filterBarContainer = new JPanel(new BorderLayout());
+        filterBarContainer.setOpaque(false);
+        filterBarContainer.setAlignmentX(Component.LEFT_ALIGNMENT);
+        filterBarContainer.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
+        filterBarContainer.add(buildFilterBar(), BorderLayout.WEST);
+        content.add(filterBarContainer);
+
+        content.add(Box.createVerticalStrut(AppTheme.SPACE_SM));
+        content.add(buildTable());
 
         JScrollPane scroll = new JScrollPane(content);
         scroll.setBorder(null);
@@ -64,7 +74,7 @@ public class PaymentsPage extends JPanel {
         title.setForeground(AppTheme.TEXT_PRIMARY);
         title.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel subtitle = new JLabel("View and settle payments for your appointments.");
+        JLabel subtitle = new JLabel("View and settle your outstanding balances. Click a pending payment to pay now.");
         subtitle.setFont(FontManager.bodyFont(Font.PLAIN, 14));
         subtitle.setForeground(AppTheme.TEXT_SECONDARY);
         subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -75,156 +85,123 @@ public class PaymentsPage extends JPanel {
         return panel;
     }
 
-    // ── Data loading ─────────────────────────────────────────────
+    private JComponent buildFilterBar() {
+        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, AppTheme.SPACE_SM, 0));
+        bar.setOpaque(false);
+
+        String[][] filters = {
+                {"ALL", "All"}, {"PENDING", "Pending"}, {"PAID", "Paid"}
+        };
+
+        for (String[] f : filters) {
+            JButton btn = new JButton(f[1]);
+            btn.setFont(FontManager.bodyFont(Font.BOLD, 12));
+            btn.setFocusPainted(false);
+            btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            btn.setBackground(f[0].equals(activeFilter) ? AppTheme.PRIMARY : AppTheme.SURFACE);
+            btn.setForeground(f[0].equals(activeFilter) ? AppTheme.TEXT_ON_PRIMARY : AppTheme.TEXT_PRIMARY);
+            btn.setBorder(BorderFactory.createLineBorder(AppTheme.BORDER, 1, true));
+            btn.addActionListener(e -> {
+                activeFilter = f[0];
+                renderTable();
+                filterBarContainer.removeAll();
+                filterBarContainer.add(buildFilterBar(), BorderLayout.WEST);
+                filterBarContainer.revalidate();
+                filterBarContainer.repaint();
+            });
+            bar.add(btn);
+        }
+        return bar;
+    }
+
+    private JComponent buildTable() {
+        String[] columns = {"Doctor", "Appointment Date", "Amount", "Method", "Status", "ID"};
+        tableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int col) { return false; }
+        };
+        paymentsTable = new JTable(tableModel);
+        paymentsTable.setFont(FontManager.bodyFont(Font.PLAIN, 13));
+        paymentsTable.setRowHeight(40);
+        paymentsTable.getTableHeader().setFont(FontManager.bodyFont(Font.BOLD, 12));
+        paymentsTable.setShowGrid(false);
+        paymentsTable.setIntercellSpacing(new Dimension(0, 0));
+        paymentsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        paymentsTable.getColumnModel().getColumn(5).setMinWidth(0);
+        paymentsTable.getColumnModel().getColumn(5).setMaxWidth(0);
+        paymentsTable.getColumnModel().getColumn(5).setWidth(0);
+
+        RowClickHelper.makeRowsClickable(paymentsTable, 5, this::onRowClicked);
+
+        JScrollPane scroll = new JScrollPane(paymentsTable);
+        scroll.setPreferredSize(new Dimension(0, 400));
+        scroll.setBorder(BorderFactory.createLineBorder(AppTheme.DIVIDER));
+        scroll.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return scroll;
+    }
+
+    private void onRowClicked(int paymentId) {
+        Payment payment = findById(paymentId);
+        if (payment == null) return;
+
+        if ("PENDING".equals(payment.getPaymentStatus())) {
+            FakeCheckoutDialog.show(this, payment, this::loadData);
+        }
+        // PAID/other statuses: no action for now — could add a read-only
+        // receipt dialog later if needed.
+    }
+
+    // ── Data loading ──────────────────────────────────────────────
 
     private void loadData() {
         int patientId = SessionManager.getInstance().getUserId();
-        BaseApiClient.ApiResult<List<Payment>> result = ApiClientProvider.getInstance().payments().getAll();
 
-        List<Payment> myPayments = result.isSuccess()
-                ? result.getData().stream()
+        BaseApiClient.ApiResult<List<Payment>> result = ApiClientProvider.getInstance().payments().getAll();
+        List<Payment> all = result.isSuccess() ? result.getData() : List.of();
+
+        myPayments = all.stream()
                 .filter(p -> p.getAppointment() != null
                         && p.getAppointment().getPatient() != null
                         && p.getAppointment().getPatient().getUserId() == patientId)
-                .toList()
-                : List.of();
+                .collect(Collectors.toList());
 
-        renderList(myPayments);
+        renderTable();
     }
 
-    private void renderList(List<Payment> payments) {
-        listContainer.removeAll();
+    private void renderTable() {
+        tableModel.setRowCount(0);
 
-        if (payments.isEmpty()) {
-            listContainer.add(emptyState());
-            listContainer.revalidate();
-            listContainer.repaint();
-            return;
-        }
+        List<Payment> filtered = "ALL".equals(activeFilter)
+                ? myPayments
+                : myPayments.stream().filter(p -> activeFilter.equals(p.getPaymentStatus())).collect(Collectors.toList());
 
-        // Outstanding (PENDING) payments float to the top — those are
-        // the ones that actually need the patient's attention.
-        List<Payment> sorted = payments.stream()
-                .sorted(Comparator.comparing((Payment p) -> "PENDING".equals(p.getPaymentStatus()) ? 0 : 1))
-                .toList();
-
-        for (Payment payment : sorted) {
-            listContainer.add(paymentCard(payment));
-            listContainer.add(Box.createVerticalStrut(AppTheme.SPACE_SM));
-        }
-
-        listContainer.revalidate();
-        listContainer.repaint();
-    }
-
-    private JComponent paymentCard(Payment payment) {
-        JPanel card = new JPanel(new BorderLayout(AppTheme.SPACE_MD, 0));
-        card.setBackground(AppTheme.SURFACE);
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(AppTheme.BORDER, 1, true),
-                BorderFactory.createEmptyBorder(AppTheme.SPACE_MD, AppTheme.SPACE_MD, AppTheme.SPACE_MD, AppTheme.SPACE_MD)
-        ));
-        card.setAlignmentX(Component.LEFT_ALIGNMENT);
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 90));
-
-        JPanel textStack = new JPanel();
-        textStack.setLayout(new BoxLayout(textStack, BoxLayout.Y_AXIS));
-        textStack.setOpaque(false);
-
-        String amountText = payment.getPaymentAmount() != null
-                ? "R " + payment.getPaymentAmount().setScale(2, java.math.RoundingMode.HALF_UP)
-                : "R —";
-        JLabel amountLabel = new JLabel(amountText);
-        amountLabel.setFont(FontManager.headlineFont(Font.BOLD, 18));
-        amountLabel.setForeground(AppTheme.TEXT_PRIMARY);
-        amountLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        String doctorText = payment.getAppointment() != null
-                && payment.getAppointment().getDoctor() != null
-                && payment.getAppointment().getDoctor().getName() != null
-                ? "Dr. " + payment.getAppointment().getDoctor().getName().getFullName()
-                : "General consultation";
-        String dateText = payment.getPaymentDate() != null
-                ? " · " + payment.getPaymentDate().toLocalDate().format(DATE_FMT) : "";
-
-        JLabel metaLabel = new JLabel(doctorText + dateText);
-        metaLabel.setFont(FontManager.bodyFont(Font.PLAIN, 12));
-        metaLabel.setForeground(AppTheme.TEXT_SECONDARY);
-        metaLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        metaLabel.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
-
-        String methodText = payment.getPaymentMethod() != null ? payment.getPaymentMethod() : "Method not set";
-        JLabel methodLabel = new JLabel(methodText);
-        methodLabel.setFont(FontManager.bodyFont(Font.PLAIN, 11));
-        methodLabel.setForeground(AppTheme.TEXT_MUTED);
-        methodLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        textStack.add(amountLabel);
-        textStack.add(metaLabel);
-        textStack.add(methodLabel);
-
-        JPanel rightSide = new JPanel();
-        rightSide.setLayout(new BoxLayout(rightSide, BoxLayout.Y_AXIS));
-        rightSide.setOpaque(false);
-
-        StatusBadge badge = new StatusBadge(payment.getPaymentStatus());
-        badge.setAlignmentX(Component.RIGHT_ALIGNMENT);
-        rightSide.add(badge);
-
-        if ("PENDING".equals(payment.getPaymentStatus())) {
-            JButton payButton = new JButton("Pay Now");
-            payButton.setFont(FontManager.bodyFont(Font.BOLD, 12));
-            payButton.setForeground(AppTheme.TEXT_ON_PRIMARY);
-            payButton.setBackground(AppTheme.PRIMARY);
-            payButton.setFocusPainted(false);
-            payButton.setBorderPainted(false);
-            payButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            payButton.setBorder(BorderFactory.createEmptyBorder(6, 14, 6, 14));
-            payButton.setAlignmentX(Component.RIGHT_ALIGNMENT);
-            payButton.addActionListener(e -> payNow(payment));
-            rightSide.add(Box.createVerticalStrut(AppTheme.SPACE_SM));
-            rightSide.add(payButton);
-        }
-
-        card.add(textStack, BorderLayout.CENTER);
-        card.add(rightSide, BorderLayout.EAST);
-        return card;
-    }
-
-    private void payNow(Payment payment) {
-        String method = (String) JOptionPane.showInputDialog(this, "Choose a payment method:",
-                "Pay Now", JOptionPane.PLAIN_MESSAGE, null, PAY_METHODS, PAY_METHODS[0]);
-
-        if (method == null) return; // user cancelled
-
-        payment.setPaymentMethod(method);
-        payment.setPaymentStatus("PAID");
-        payment.setPaymentDate(java.time.LocalDateTime.now());
-
-        BaseApiClient.ApiResult<Payment> result = ApiClientProvider.getInstance().payments().update(payment);
-
-        if (result.isSuccess()) {
-            AppDialog.show(this, "Payment Successful", "Your payment has been recorded.", AppDialog.Type.SUCCESS);
-            loadData();
-        } else {
-            AppDialog.show(this, "Payment Failed",
-                    result.getMessage() != null ? result.getMessage() : "Something went wrong.", AppDialog.Type.ERROR);
+        for (Payment payment : filtered) {
+            tableModel.addRow(new Object[]{
+                    doctorName(payment),
+                    appointmentDate(payment),
+                    payment.getPaymentAmount() != null ? "R" + payment.getPaymentAmount().setScale(2, RoundingMode.HALF_UP) : "—",
+                    payment.getPaymentMethod() != null ? payment.getPaymentMethod() : "—",
+                    payment.getPaymentStatus() != null ? payment.getPaymentStatus() : "—",
+                    payment.getPaymentId()
+            });
         }
     }
 
-    private JComponent emptyState() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setOpaque(false);
-        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.setBorder(BorderFactory.createEmptyBorder(AppTheme.SPACE_XL, 0, 0, 0));
+    private String doctorName(Payment payment) {
+        Appointment appt = payment.getAppointment();
+        if (appt == null || appt.getDoctor() == null || appt.getDoctor().getName() == null) return "—";
+        String last = appt.getDoctor().getName().getLastName();
+        return "Dr. " + (last != null ? last : "—");
+    }
 
-        JLabel label = new JLabel("You have no payment records yet.");
-        label.setFont(FontManager.bodyFont(Font.PLAIN, 14));
-        label.setForeground(AppTheme.TEXT_MUTED);
-        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+    private String appointmentDate(Payment payment) {
+        Appointment appt = payment.getAppointment();
+        if (appt == null || appt.getAppointmentDate() == null) return "—";
+        return appt.getAppointmentDate().toString();
+    }
 
-        panel.add(label);
-        return panel;
+    private Payment findById(int paymentId) {
+        return myPayments.stream().filter(p -> p.getPaymentId() == paymentId).findFirst().orElse(null);
     }
 }

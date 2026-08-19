@@ -1,9 +1,12 @@
 package za.ac.cput.ui.patient.components;
 
+import com.github.lgooddatepicker.components.DatePicker;
+import com.github.lgooddatepicker.components.DatePickerSettings;
+import com.github.lgooddatepicker.components.TimePicker;
+import com.github.lgooddatepicker.components.TimePickerSettings;
 import za.ac.cput.api.ApiClientProvider;
 import za.ac.cput.api.BaseApiClient;
 import za.ac.cput.model.domain.Appointment;
-import za.ac.cput.model.domain.Doctor;
 import za.ac.cput.model.domain.Patient;
 import za.ac.cput.session.SessionManager;
 import za.ac.cput.ui.theme.AppDialog;
@@ -14,28 +17,20 @@ import javax.swing.*;
 import java.awt.*;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
 
 /**
- * Simple appointment-booking dialog for patients. Doctor list comes from
- * DoctorApiClient.getAll() (no specialty/availability filtering yet — out
- * of scope given the time available). Time is a fixed set of half-hour
- * slots rather than free text, so the backend always receives a clean
- * LocalTime with no parsing risk.
+ * Booking never assigns a doctor or sets a status beyond PENDING — doctor
+ * assignment happens at approval time (nurse/admin's job), not here. Date
+ * picker blocks past dates natively via setDateRangeLimits(); no business-
+ * hours or doctor-availability enforcement exists in the backend yet, so
+ * none is attempted client-side either.
  */
 public class BookAppointmentDialog {
 
-    private static final String[] TIME_SLOTS = {
-            "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-            "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00"
-    };
-
-    public static void show(Component parent, Runnable onCreated) {
+    public static void show(Component parent, Runnable onBooked) {
         JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(parent),
-                "Book Appointment", Dialog.ModalityType.APPLICATION_MODAL);
-        dialog.setSize(440, 420);
+                "Book New Appointment", Dialog.ModalityType.APPLICATION_MODAL);
+        dialog.setSize(460, 480);
         dialog.setLocationRelativeTo(parent);
 
         JPanel content = new JPanel();
@@ -43,61 +38,41 @@ public class BookAppointmentDialog {
         content.setBackground(AppTheme.SURFACE);
         content.setBorder(BorderFactory.createEmptyBorder(AppTheme.SPACE_LG, AppTheme.SPACE_LG, AppTheme.SPACE_LG, AppTheme.SPACE_LG));
 
-        JLabel subtitle = new JLabel("Request a new appointment. The clinic will review and confirm it.");
-        subtitle.setFont(FontManager.bodyFont(Font.PLAIN, 13));
-        subtitle.setForeground(AppTheme.TEXT_SECONDARY);
-        subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
-        subtitle.setBorder(BorderFactory.createEmptyBorder(0, 0, AppTheme.SPACE_MD, 0));
+        JLabel dateLabel = fieldLabel("Preferred Date");
 
-        // ── Doctor dropdown ──
-        JLabel doctorLabel = fieldLabel("Doctor");
-        JComboBox<Doctor> doctorCombo = new JComboBox<>();
-        doctorCombo.setAlignmentX(Component.LEFT_ALIGNMENT);
-        doctorCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
-        doctorCombo.setRenderer(new DefaultListCellRenderer() {
-            @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
-                                                          boolean isSelected, boolean cellHasFocus) {
-                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                if (value instanceof Doctor doctor) {
-                    String name = doctor.getName() != null ? doctor.getName().getFullName() : "Unnamed";
-                    String specialty = doctor.getSpecialty() != null ? doctor.getSpecialty() : "General";
-                    setText("Dr. " + name + " — " + specialty);
-                }
-                return this;
-            }
-        });
-        loadDoctors(doctorCombo);
+        DatePickerSettings dateSettings = new DatePickerSettings();
+        DatePicker datePicker = new DatePicker(dateSettings);
+        dateSettings.setDateRangeLimits(LocalDate.now(), null); // must come AFTER constructing the DatePicker
+        datePicker.setAlignmentX(Component.LEFT_ALIGNMENT);
+        datePicker.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
 
-        // ── Date picker (JSpinner, date-only) ──
-        JLabel dateLabelText = fieldLabel("Date");
-        JSpinner dateSpinner = new JSpinner(new SpinnerDateModel());
-        dateSpinner.setEditor(new JSpinner.DateEditor(dateSpinner, "yyyy-MM-dd"));
-        dateSpinner.setAlignmentX(Component.LEFT_ALIGNMENT);
-        dateSpinner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
-        Calendar tomorrow = Calendar.getInstance();
-        tomorrow.add(Calendar.DAY_OF_MONTH, 1);
-        dateSpinner.setValue(tomorrow.getTime());
+        JLabel timeLabel = fieldLabel("Preferred Time");
 
-        // ── Time slot dropdown ──
-        JLabel timeLabel = fieldLabel("Time");
-        JComboBox<String> timeCombo = new JComboBox<>(TIME_SLOTS);
-        timeCombo.setAlignmentX(Component.LEFT_ALIGNMENT);
-        timeCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        TimePickerSettings timeSettings = new TimePickerSettings();
+        TimePicker timePicker = new TimePicker(timeSettings);
+        timePicker.setAlignmentX(Component.LEFT_ALIGNMENT);
+        timePicker.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
 
-        // ── Reason ──
-        JLabel reasonLabel = fieldLabel("Reason for visit");
-        JTextArea reasonArea = new JTextArea(3, 20);
+        JLabel reasonLabel = fieldLabel("Reason for Visit");
+
+        JTextArea reasonArea = new JTextArea(4, 20);
         reasonArea.setFont(FontManager.bodyFont(Font.PLAIN, 13));
         reasonArea.setLineWrap(true);
         reasonArea.setWrapStyleWord(true);
         reasonArea.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(AppTheme.BORDER, 1, true),
-                BorderFactory.createEmptyBorder(6, 8, 6, 8)
+                BorderFactory.createEmptyBorder(8, 10, 8, 10)
         ));
         JScrollPane reasonScroll = new JScrollPane(reasonArea);
         reasonScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
-        reasonScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 80));
+        reasonScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 100));
+
+        JLabel infoNote = new JLabel("<html><i>A nurse or admin will review your request "
+                + "and confirm a doctor and appointment time shortly.</i></html>");
+        infoNote.setFont(FontManager.bodyFont(Font.PLAIN, 12));
+        infoNote.setForeground(AppTheme.TEXT_MUTED);
+        infoNote.setAlignmentX(Component.LEFT_ALIGNMENT);
+        infoNote.setBorder(BorderFactory.createEmptyBorder(AppTheme.SPACE_SM, 0, 0, 0));
 
         JLabel errorLabel = new JLabel(" ");
         errorLabel.setFont(FontManager.bodyFont(Font.PLAIN, 12));
@@ -123,43 +98,34 @@ public class BookAppointmentDialog {
         submit.setBorderPainted(false);
         submit.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         submit.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 16));
-
         submit.addActionListener(e -> {
-            Doctor selectedDoctor = (Doctor) doctorCombo.getSelectedItem();
-            if (selectedDoctor == null) {
-                errorLabel.setText("Please select a doctor.");
-                return;
-            }
-
-            Date selectedDate = (Date) dateSpinner.getValue();
-            LocalDate appointmentDate = selectedDate.toInstant()
-                    .atZone(java.time.ZoneId.systemDefault()).toLocalDate();
-            if (appointmentDate.isBefore(LocalDate.now())) {
-                errorLabel.setText("Please choose a date in the future.");
-                return;
-            }
-
+            LocalDate date = datePicker.getDate();
+            LocalTime time = timePicker.getTime();
             String reason = reasonArea.getText().trim();
-            if (reason.isEmpty()) {
-                errorLabel.setText("Please enter a reason for the visit.");
+
+            if (date == null) {
+                errorLabel.setText("Please select a date.");
                 return;
             }
-
-            LocalTime appointmentTime = LocalTime.parse((String) timeCombo.getSelectedItem());
-
-            // Only the patient's ID is needed for the backend to link the
-            // foreign key — we don't have (and don't need) the patient's
-            // full record here, just who's logged in.
-            Patient patient = new Patient();
-            patient.setUserId(SessionManager.getInstance().getUserId());
+            if (time == null) {
+                errorLabel.setText("Please select a time.");
+                return;
+            }
+            if (reason.isEmpty()) {
+                errorLabel.setText("Please enter a reason for your visit.");
+                return;
+            }
+            errorLabel.setText(" ");
 
             Appointment appointment = new Appointment();
-            appointment.setPatient(patient);
-            appointment.setDoctor(selectedDoctor);
-            appointment.setAppointmentDate(appointmentDate);
-            appointment.setAppointmentTime(appointmentTime);
+            appointment.setAppointmentDate(date);
+            appointment.setAppointmentTime(time);
             appointment.setReason(reason);
             appointment.setConfirmationStatus("PENDING");
+
+            Patient self = new Patient();
+            self.setUserId(SessionManager.getInstance().getUserId());
+            appointment.setPatient(self);
 
             BaseApiClient.ApiResult<Appointment> result =
                     ApiClientProvider.getInstance().appointments().create(appointment);
@@ -167,29 +133,25 @@ public class BookAppointmentDialog {
             if (result.isSuccess()) {
                 dialog.dispose();
                 AppDialog.show(parent, "Appointment Requested",
-                        "Your appointment request has been sent. You'll see it as PENDING until the clinic confirms it.",
-                        AppDialog.Type.SUCCESS);
-                if (onCreated != null) onCreated.run();
+                        "Your appointment request has been submitted for review.", AppDialog.Type.SUCCESS);
+                if (onBooked != null) onBooked.run();
             } else {
-                errorLabel.setText(result.getMessage() != null ? result.getMessage() : "Unable to book appointment.");
+                errorLabel.setText(result.getMessage() != null ? result.getMessage() : "Unable to submit request.");
             }
         });
 
         buttonRow.add(cancel);
         buttonRow.add(submit);
 
-        content.add(subtitle);
-        content.add(doctorLabel);
-        content.add(doctorCombo);
-        content.add(Box.createVerticalStrut(AppTheme.SPACE_SM));
-        content.add(dateLabelText);
-        content.add(dateSpinner);
+        content.add(dateLabel);
+        content.add(datePicker);
         content.add(Box.createVerticalStrut(AppTheme.SPACE_SM));
         content.add(timeLabel);
-        content.add(timeCombo);
+        content.add(timePicker);
         content.add(Box.createVerticalStrut(AppTheme.SPACE_SM));
         content.add(reasonLabel);
         content.add(reasonScroll);
+        content.add(infoNote);
         content.add(errorLabel);
         content.add(buttonRow);
 
@@ -197,21 +159,12 @@ public class BookAppointmentDialog {
         dialog.setVisible(true);
     }
 
-    private static void loadDoctors(JComboBox<Doctor> combo) {
-        BaseApiClient.ApiResult<List<Doctor>> result = ApiClientProvider.getInstance().doctors().getAll();
-        if (result.isSuccess()) {
-            for (Doctor doctor : result.getData()) {
-                combo.addItem(doctor);
-            }
-        }
-    }
-
     private static JLabel fieldLabel(String text) {
         JLabel label = new JLabel(text);
         label.setFont(FontManager.bodyFont(Font.BOLD, 12));
         label.setForeground(AppTheme.TEXT_PRIMARY);
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
-        label.setBorder(BorderFactory.createEmptyBorder(AppTheme.SPACE_XS, 0, 4, 0));
+        label.setBorder(BorderFactory.createEmptyBorder(0, 0, 4, 0));
         return label;
     }
 }

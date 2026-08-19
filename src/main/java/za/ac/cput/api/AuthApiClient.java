@@ -94,4 +94,21 @@ public class AuthApiClient {
         }
         return client.post(url, null, String.class);
     }
+
+    // ==========================================
+    // Forgot Password Flow
+    // ==========================================
+
+    public BaseApiClient.ApiResult<String> forgotPassword(ForgotPasswordRequest request) {
+        return client.post("/auth/forgot-password", request, String.class);
+    }
+
+    /** Returns the reset session token as the response body on success. */
+    public BaseApiClient.ApiResult<String> verifyResetCode(VerifyResetCodeRequest request) {
+        return client.post("/auth/verify-reset-code", request, String.class);
+    }
+
+    public BaseApiClient.ApiResult<String> resetPassword(ResetPasswordRequest request) {
+        return client.post("/auth/reset-password", request, String.class);
+    }
 }

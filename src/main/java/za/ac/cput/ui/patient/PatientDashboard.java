@@ -57,9 +57,9 @@ public class PatientDashboard extends JPanel {
     }
 
     /**
-     * Pages are swapped in one at a time as they're built. Home and
-     * Appointments are real now; Tickets/Payments/Notifications/Profile
-     * are still placeholders until their turn.
+     * All six pages are real now — DashboardPage, AppointmentsPage,
+     * TicketsPage, PaymentsPage, NotificationsPage, ProfilePage — each
+     * verified end to end against a real backend.
      */
     private void registerPages() {
         pageContainer.add(new DashboardPage(), PAGE_HOME);
@@ -67,7 +67,8 @@ public class PatientDashboard extends JPanel {
         pageContainer.add(new TicketsPage(), PAGE_TICKETS);
         pageContainer.add(new PaymentsPage(), PAGE_PAYMENTS);
         pageContainer.add(new NotificationsPage(), PAGE_NOTIFICATIONS);
-        pageContainer.add(new ProfilePage(), PAGE_PROFILE);    }
+        pageContainer.add(new ProfilePage(), PAGE_PROFILE);
+    }
 
     private JComponent placeholder(String message) {
         JPanel panel = new JPanel(new GridBagLayout());

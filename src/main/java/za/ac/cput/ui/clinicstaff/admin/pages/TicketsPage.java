@@ -6,6 +6,7 @@ import za.ac.cput.model.domain.Payment;
 import za.ac.cput.model.domain.PatientTicket;
 import za.ac.cput.ui.clinicstaff.admin.components.SummaryCard;
 import za.ac.cput.ui.clinicstaff.admin.components.TicketDetailsDialog;
+import za.ac.cput.ui.layout.RowClickHelper;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
 
@@ -18,16 +19,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Shared Tickets page for Admin and Nurse — per the appointment workflow
- * doc, both roles have identical operational access here (monitor tickets,
- * generate payment requests). No separate NurseTicketsPage; this class is
- * reused as-is once the Nurse dashboard is built.
- *
- * Status model note: PatientTicket.currentStatus uses the real backend
- * StatusType enum (OPEN, IN_PROGRESS, RESOLVED, CLOSED, ESCALATED), not
- * the doc's informal "Ready for Payment" label — RESOLVED is treated as
- * "ready for payment" here since that's the state right before a Payment
- * row exists.
+ * Row-click pattern: clicking anywhere on a row opens TicketDetailsDialog,
+ * which already owns the Generate Payment / Mark as Paid CTAs conditionally
+ * based on status. No Action column, no ActionCellRenderer/ActionCellEditor.
  */
 public class TicketsPage extends JPanel {
 
@@ -39,6 +33,7 @@ public class TicketsPage extends JPanel {
     private List<PatientTicket> allTickets = List.of();
     private Map<Integer, Payment> paymentsByAppointmentId = new HashMap<>();
     private String activeFilter = "ALL";
+    private JPanel filterBarContainer;
 
     public TicketsPage() {
         setLayout(new BorderLayout());
@@ -56,7 +51,14 @@ public class TicketsPage extends JPanel {
         needsAttentionSection = buildEmptySection();
         content.add(needsAttentionSection);
         content.add(Box.createVerticalStrut(AppTheme.SPACE_LG));
-        content.add(buildFilterBar());
+
+        filterBarContainer = new JPanel(new BorderLayout());
+        filterBarContainer.setOpaque(false);
+        filterBarContainer.setAlignmentX(Component.LEFT_ALIGNMENT);
+        filterBarContainer.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
+        filterBarContainer.add(buildFilterBar(), BorderLayout.WEST);
+        content.add(filterBarContainer);
+
         content.add(Box.createVerticalStrut(AppTheme.SPACE_SM));
         content.add(buildTable());
 
@@ -79,7 +81,7 @@ public class TicketsPage extends JPanel {
         title.setForeground(AppTheme.TEXT_PRIMARY);
         title.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel subtitle = new JLabel("Manage patient consultation tickets and payment progress.");
+        JLabel subtitle = new JLabel("Manage patient consultation tickets and payment progress. Click a row to view details.");
         subtitle.setFont(FontManager.bodyFont(Font.PLAIN, 14));
         subtitle.setForeground(AppTheme.TEXT_SECONDARY);
         subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -119,7 +121,6 @@ public class TicketsPage extends JPanel {
     private JComponent buildFilterBar() {
         JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, AppTheme.SPACE_SM, 0));
         bar.setOpaque(false);
-        bar.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         String[][] filters = {
                 {"ALL", "All"}, {"OPEN", "Open"}, {"IN_PROGRESS", "In Consultation"},
@@ -137,17 +138,10 @@ public class TicketsPage extends JPanel {
             btn.addActionListener(e -> {
                 activeFilter = f[0];
                 renderTable();
-                // Refresh filter bar styling by rebuilding — simplest correct approach
-                // given buttons don't currently expose a re-stylable reference map.
-                Container parentPanel = bar.getParent();
-                if (parentPanel != null) {
-                    int idx = java.util.Arrays.asList(parentPanel.getComponents()).indexOf(bar);
-                    parentPanel.remove(bar);
-                    JComponent rebuilt = (JComponent) buildFilterBar();
-                    parentPanel.add(rebuilt, idx);
-                    parentPanel.revalidate();
-                    parentPanel.repaint();
-                }
+                filterBarContainer.removeAll();
+                filterBarContainer.add(buildFilterBar(), BorderLayout.WEST);
+                filterBarContainer.revalidate();
+                filterBarContainer.repaint();
             });
             bar.add(btn);
         }
@@ -155,10 +149,11 @@ public class TicketsPage extends JPanel {
     }
 
     private JComponent buildTable() {
-        String[] columns = {"Ticket", "Patient", "Doctor", "Appointment", "Status", "Amount", "Action"};
+        // ID column stays in the model for RowClickHelper, hidden from view.
+        String[] columns = {"Ticket", "Patient", "Doctor", "Appointment", "Status", "Amount", "ID"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
-            public boolean isCellEditable(int row, int col) { return col == 6; }
+            public boolean isCellEditable(int row, int col) { return false; }
         };
         ticketsTable = new JTable(tableModel);
         ticketsTable.setFont(FontManager.bodyFont(Font.PLAIN, 13));
@@ -166,8 +161,13 @@ public class TicketsPage extends JPanel {
         ticketsTable.getTableHeader().setFont(FontManager.bodyFont(Font.BOLD, 12));
         ticketsTable.setShowGrid(false);
         ticketsTable.setIntercellSpacing(new Dimension(0, 0));
-        ticketsTable.getColumnModel().getColumn(6).setCellRenderer(new ActionCellRenderer());
-        ticketsTable.getColumnModel().getColumn(6).setCellEditor(new ActionCellEditor());
+        ticketsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        ticketsTable.getColumnModel().getColumn(6).setMinWidth(0);
+        ticketsTable.getColumnModel().getColumn(6).setMaxWidth(0);
+        ticketsTable.getColumnModel().getColumn(6).setWidth(0);
+
+        RowClickHelper.makeRowsClickable(ticketsTable, 6, this::onRowClicked);
 
         JScrollPane scroll = new JScrollPane(ticketsTable);
         scroll.setPreferredSize(new Dimension(0, 360));
@@ -176,10 +176,18 @@ public class TicketsPage extends JPanel {
         return scroll;
     }
 
+    private void onRowClicked(int ticketId) {
+        PatientTicket ticket = findTicketById(ticketId);
+        if (ticket == null) return;
+
+        Payment payment = ticket.getAppointment() != null
+                ? paymentsByAppointmentId.get(ticket.getAppointment().getAppointmentId())
+                : null;
+
+        TicketDetailsDialog.show(this, ticket, payment, this::loadData);
+    }
+
     // ── Data loading ──────────────────────────────────────────────
-    // Single getAll() call each for tickets and payments; payments are
-    // indexed by appointment ID client-side since no findByAppointmentId
-    // endpoint exists on the backend yet.
 
     private void loadData() {
         BaseApiClient.ApiResult<List<PatientTicket>> ticketResult =
@@ -200,15 +208,10 @@ public class TicketsPage extends JPanel {
     }
 
     private void updateSummaryCards() {
-        long open = countByStatus("OPEN");
-        long inProgress = countByStatus("IN_PROGRESS");
-        long resolved = countByStatus("RESOLVED");
-        long closed = countByStatus("CLOSED");
-
-        openCard.setValue(String.valueOf(open));
-        inProgressCard.setValue(String.valueOf(inProgress));
-        resolvedCard.setValue(String.valueOf(resolved));
-        closedCard.setValue(String.valueOf(closed));
+        openCard.setValue(String.valueOf(countByStatus("OPEN")));
+        inProgressCard.setValue(String.valueOf(countByStatus("IN_PROGRESS")));
+        resolvedCard.setValue(String.valueOf(countByStatus("RESOLVED")));
+        closedCard.setValue(String.valueOf(countByStatus("CLOSED")));
     }
 
     private long countByStatus(String status) {
@@ -282,6 +285,10 @@ public class TicketsPage extends JPanel {
         viewButton.addActionListener(e -> {
             activeFilter = filterOnClick;
             renderTable();
+            filterBarContainer.removeAll();
+            filterBarContainer.add(buildFilterBar(), BorderLayout.WEST);
+            filterBarContainer.revalidate();
+            filterBarContainer.repaint();
         });
 
         banner.add(textStack, BorderLayout.WEST);
@@ -332,64 +339,7 @@ public class TicketsPage extends JPanel {
         return ticket.getAppointment().getAppointmentDate().toString();
     }
 
-    // ── Table action column ──────────────────────────────────────
-
     private PatientTicket findTicketById(int ticketId) {
         return allTickets.stream().filter(t -> t.getTicketId() == ticketId).findFirst().orElse(null);
-    }
-
-    private class ActionCellRenderer extends JPanel implements javax.swing.table.TableCellRenderer {
-        ActionCellRenderer() { setLayout(new FlowLayout(FlowLayout.LEFT, 4, 4)); }
-
-        @Override
-        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
-                                                       boolean hasFocus, int row, int col) {
-            removeAll();
-            setBackground(AppTheme.SURFACE);
-            add(smallButton("View"));
-            return this;
-        }
-    }
-
-    private class ActionCellEditor extends AbstractCellEditor implements javax.swing.table.TableCellEditor {
-        private final JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
-        private int currentTicketId;
-
-        ActionCellEditor() {
-            JButton viewBtn = smallButton("View");
-            viewBtn.addActionListener(e -> {
-                fireEditingStopped();
-                PatientTicket ticket = findTicketById(currentTicketId);
-                if (ticket != null) {
-                    Payment payment = ticket.getAppointment() != null
-                            ? paymentsByAppointmentId.get(ticket.getAppointment().getAppointmentId())
-                            : null;
-                    TicketDetailsDialog.show(TicketsPage.this, ticket, payment, TicketsPage.this::loadData);
-                }
-            });
-            panel.add(viewBtn);
-            panel.setBackground(AppTheme.SURFACE);
-        }
-
-        @Override
-        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int col) {
-            currentTicketId = (int) tableModel.getValueAt(row, 6);
-            return panel;
-        }
-
-        @Override
-        public Object getCellEditorValue() { return currentTicketId; }
-    }
-
-    private JButton smallButton(String text) {
-        JButton button = new JButton(text);
-        button.setFont(FontManager.bodyFont(Font.BOLD, 11));
-        button.setForeground(AppTheme.PRIMARY);
-        button.setBackground(AppTheme.SURFACE);
-        button.setBorder(BorderFactory.createLineBorder(AppTheme.PRIMARY, 1, true));
-        button.setFocusPainted(false);
-        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        button.setMargin(new Insets(2, 8, 2, 8));
-        return button;
     }
 }
