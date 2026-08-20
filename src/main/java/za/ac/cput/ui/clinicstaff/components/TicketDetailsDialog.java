@@ -1,4 +1,4 @@
-package za.ac.cput.ui.clinicstaff.admin.components;
+package za.ac.cput.ui.clinicstaff.components;
 
 import za.ac.cput.api.ApiClientProvider;
 import za.ac.cput.api.BaseApiClient;
@@ -12,16 +12,19 @@ import za.ac.cput.ui.theme.FontManager;
 import javax.swing.*;
 import java.awt.*;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
 
 /**
  * Modal detail view for a single ticket. Shows patient/doctor/appointment
  * context, full status history, and — only when the ticket is RESOLVED and
  * no Payment row exists yet for its appointment — a "Generate Payment
- * Request" action. This mirrors the nurse/admin operational split from the
- * appointment workflow doc: doctors own the clinical side (consultation
- * notes aren't modeled on PatientTicket yet, so there's nothing to show
- * there beyond status/notes), nurse/admin own getting the ticket to CLOSED.
+ * Request" action.
+ *
+ * Payment confirmation ("Mark as Paid") depends on payment method: EFT is
+ * settled entirely by the patient via self-checkout (their own Payments
+ * page); CASH, CARD, and MEDICAL_AID are collected in person, so staff
+ * confirm those here once received.
  */
 public class TicketDetailsDialog {
 
@@ -61,12 +64,30 @@ public class TicketDetailsDialog {
 
         if (existingPayment != null) {
             content.add(fieldBlock("Amount", "R" + formatAmount(existingPayment.getPaymentAmount())));
+            content.add(fieldBlock("Method", existingPayment.getPaymentMethod() != null ? existingPayment.getPaymentMethod() : "—"));
             JLabel payStatus = new JLabel(existingPayment.getPaymentStatus());
             payStatus.setFont(FontManager.bodyFont(Font.BOLD, 13));
             payStatus.setForeground(AppTheme.statusColor(existingPayment.getPaymentStatus()));
             content.add(labeledRow("Status", payStatus));
 
-            if ("PENDING".equals(existingPayment.getPaymentStatus())) {
+            boolean isEft = "EFT".equals(existingPayment.getPaymentMethod());
+            boolean isPending = "PENDING".equals(existingPayment.getPaymentStatus());
+
+            if (isPending && isEft) {
+                JLabel waiting = new JLabel("<html><i>Waiting for the patient to complete payment on their dashboard.</i></html>");
+                waiting.setFont(FontManager.bodyFont(Font.PLAIN, 12));
+                waiting.setForeground(AppTheme.TEXT_MUTED);
+                waiting.setAlignmentX(Component.LEFT_ALIGNMENT);
+                waiting.setBorder(BorderFactory.createEmptyBorder(AppTheme.SPACE_SM, 0, 0, 0));
+                content.add(waiting);
+            } else if (isPending) {
+                JLabel note = new JLabel("<html><i>Collected in person — confirm once received.</i></html>");
+                note.setFont(FontManager.bodyFont(Font.PLAIN, 12));
+                note.setForeground(AppTheme.TEXT_MUTED);
+                note.setAlignmentX(Component.LEFT_ALIGNMENT);
+                note.setBorder(BorderFactory.createEmptyBorder(AppTheme.SPACE_SM, 0, AppTheme.SPACE_SM, 0));
+                content.add(note);
+
                 JButton markPaidButton = new JButton("Mark as Paid");
                 markPaidButton.setFont(FontManager.bodyFont(Font.BOLD, 13));
                 markPaidButton.setForeground(AppTheme.TEXT_ON_PRIMARY);
@@ -77,8 +98,21 @@ public class TicketDetailsDialog {
                 markPaidButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                 markPaidButton.setBorder(BorderFactory.createEmptyBorder(6, 14, 6, 14));
                 markPaidButton.addActionListener(e -> markAsPaid(dialog, parent, existingPayment, onChanged));
-                content.add(Box.createVerticalStrut(AppTheme.SPACE_SM));
                 content.add(markPaidButton);
+            } else if ("FAILED".equals(existingPayment.getPaymentStatus())) {
+                JLabel note = new JLabel("<html><i>This payment attempt failed.</i></html>");
+                note.setFont(FontManager.bodyFont(Font.PLAIN, 12));
+                note.setForeground(AppTheme.STATUS_DANGER);
+                note.setAlignmentX(Component.LEFT_ALIGNMENT);
+                note.setBorder(BorderFactory.createEmptyBorder(AppTheme.SPACE_SM, 0, 0, 0));
+                content.add(note);
+            } else if ("REFUNDED".equals(existingPayment.getPaymentStatus())) {
+                JLabel note = new JLabel("<html><i>This payment has been refunded.</i></html>");
+                note.setFont(FontManager.bodyFont(Font.PLAIN, 12));
+                note.setForeground(AppTheme.TEXT_MUTED);
+                note.setAlignmentX(Component.LEFT_ALIGNMENT);
+                note.setBorder(BorderFactory.createEmptyBorder(AppTheme.SPACE_SM, 0, 0, 0));
+                content.add(note);
             }
         } else if ("RESOLVED".equals(ticket.getCurrentStatus())) {
             JLabel noPayment = new JLabel("No payment request has been generated yet.");
@@ -117,50 +151,12 @@ public class TicketDetailsDialog {
         dialog.setVisible(true);
     }
 
-    // Note: no consultation-fee input here — Payment.paymentAmount must
-    // come from somewhere. PatientTicket has no fee field, so for now the
-    // admin/nurse types it in manually when generating the request. If a
-    // "consultationFee" field ever gets added to PatientTicket/TicketStatus
-    // by the doctor at RESOLVED time, this should read that instead of
-    // prompting — flagging as a known gap, not a design choice.
-    private static void generatePayment(JDialog dialog, Component parent, PatientTicket ticket, Runnable onChanged) {
-        String amountStr = JOptionPane.showInputDialog(dialog,
-                "Enter the consultation fee for this ticket:", "Generate Payment Request",
-                JOptionPane.PLAIN_MESSAGE);
-        if (amountStr == null || amountStr.isBlank()) return;
-
-        BigDecimal amount;
-        try {
-            amount = new BigDecimal(amountStr.trim());
-        } catch (NumberFormatException ex) {
-            AppDialog.show(parent, "Invalid Amount", "Please enter a valid number.", AppDialog.Type.ERROR);
-            return;
-        }
-
-        Payment payment = new Payment();
-        payment.setAppointment(ticket.getAppointment());
-        payment.setPaymentAmount(amount);
-        payment.setPaymentStatus("PENDING");
-
-        BaseApiClient.ApiResult<Payment> result = ApiClientProvider.getInstance().payments().create(payment);
-
-        if (result.isSuccess()) {
-            dialog.dispose();
-            AppDialog.show(parent, "Payment Request Generated",
-                    "A payment request for R" + formatAmount(amount) + " has been created.", AppDialog.Type.SUCCESS);
-            if (onChanged != null) onChanged.run();
-        } else {
-            AppDialog.show(parent, "Unable to Generate Payment",
-                    result.getMessage() != null ? result.getMessage() : "Something went wrong.", AppDialog.Type.ERROR);
-        }
-    }
-
-    // Sends the payment back with paymentStatus flipped to PAID. Backend's
-    // PaymentService.update() detects this and auto-closes the linked ticket,
-    // so no separate "close ticket" call is needed here.
+    // Flipping to PAID triggers PaymentService.closeTicketIfPaid() server-side
+    // automatically — no separate "close ticket" call needed here.
     private static void markAsPaid(JDialog dialog, Component parent, Payment payment, Runnable onChanged) {
         int confirm = JOptionPane.showConfirmDialog(dialog,
-                "Confirm that payment of R" + formatAmount(payment.getPaymentAmount()) + " has been received?",
+                "Confirm that payment of R" + formatAmount(payment.getPaymentAmount())
+                        + " has been received in person?",
                 "Mark as Paid", JOptionPane.YES_NO_OPTION);
         if (confirm != JOptionPane.YES_OPTION) return;
 
@@ -179,7 +175,7 @@ public class TicketDetailsDialog {
     }
 
     private static String formatAmount(BigDecimal amount) {
-        return amount != null ? amount.setScale(2, java.math.RoundingMode.HALF_UP).toString() : "0.00";
+        return amount != null ? amount.setScale(2, RoundingMode.HALF_UP).toString() : "0.00";
     }
 
     private static String patientName(PatientTicket ticket) {

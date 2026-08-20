@@ -1,4 +1,4 @@
-package za.ac.cput.ui.clinicstaff.admin.components;
+package za.ac.cput.ui.clinicstaff.components;
 
 import za.ac.cput.model.domain.ClinicStaff;
 import za.ac.cput.model.domain.Doctor;

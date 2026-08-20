@@ -6,7 +6,7 @@ import za.ac.cput.model.domain.PatientTicket;
 import za.ac.cput.session.SessionManager;
 import za.ac.cput.ui.doctor.components.CompleteConsultationDialog;
 import za.ac.cput.ui.doctor.components.TicketDetailsDialog;
-import za.ac.cput.ui.clinicstaff.admin.components.SummaryCard;
+import za.ac.cput.ui.clinicstaff.components.SummaryCard;
 import za.ac.cput.ui.theme.AppDialog;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;

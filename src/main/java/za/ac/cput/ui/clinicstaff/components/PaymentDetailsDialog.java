@@ -1,7 +1,10 @@
-package za.ac.cput.ui.clinicstaff.admin.components;
+package za.ac.cput.ui.clinicstaff.components;
 
+import za.ac.cput.api.ApiClientProvider;
+import za.ac.cput.api.BaseApiClient;
 import za.ac.cput.model.domain.Appointment;
 import za.ac.cput.model.domain.Payment;
+import za.ac.cput.ui.theme.AppDialog;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
 
@@ -10,16 +13,17 @@ import java.awt.*;
 import java.math.RoundingMode;
 
 /**
- * Read-only for admin/nurse — payment confirmation is now entirely the
- * patient's action (their own Payments page). Staff can monitor status
- * here but can no longer mark anything paid on the patient's behalf.
+ * For EFT payments, this dialog is read-only — settlement is entirely the
+ * patient's self-checkout action. For CASH, CARD, and MEDICAL_AID, staff
+ * collect payment in person, so a "Mark as Paid" action is shown here for
+ * PENDING payments of those methods only.
  */
 public class PaymentDetailsDialog {
 
-    public static void show(Component parent, Payment payment) {
+    public static void show(Component parent, Payment payment, Runnable onChanged) {
         JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(parent),
                 "Payment Details", Dialog.ModalityType.APPLICATION_MODAL);
-        dialog.setSize(420, 380);
+        dialog.setSize(420, 400);
         dialog.setLocationRelativeTo(parent);
 
         JPanel content = new JPanel();
@@ -41,8 +45,43 @@ public class PaymentDetailsDialog {
 
         content.add(Box.createVerticalStrut(AppTheme.SPACE_MD));
 
-        if ("PENDING".equals(payment.getPaymentStatus())) {
+        boolean isEft = "EFT".equals(payment.getPaymentMethod());
+        boolean isPending = "PENDING".equals(payment.getPaymentStatus());
+
+        if (isPending && isEft) {
             JLabel note = new JLabel("<html><i>Waiting for the patient to complete payment on their dashboard.</i></html>");
+            note.setFont(FontManager.bodyFont(Font.PLAIN, 12));
+            note.setForeground(AppTheme.TEXT_MUTED);
+            note.setAlignmentX(Component.LEFT_ALIGNMENT);
+            content.add(note);
+        } else if (isPending) {
+            // CASH / CARD / MEDICAL_AID — collected in person, staff confirms.
+            JLabel note = new JLabel("<html><i>Collected in person — confirm once received.</i></html>");
+            note.setFont(FontManager.bodyFont(Font.PLAIN, 12));
+            note.setForeground(AppTheme.TEXT_MUTED);
+            note.setAlignmentX(Component.LEFT_ALIGNMENT);
+            note.setBorder(BorderFactory.createEmptyBorder(0, 0, AppTheme.SPACE_SM, 0));
+            content.add(note);
+
+            JButton markPaidButton = new JButton("Mark as Paid");
+            markPaidButton.setFont(FontManager.bodyFont(Font.BOLD, 13));
+            markPaidButton.setForeground(AppTheme.TEXT_ON_PRIMARY);
+            markPaidButton.setBackground(AppTheme.STATUS_SUCCESS);
+            markPaidButton.setFocusPainted(false);
+            markPaidButton.setBorderPainted(false);
+            markPaidButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+            markPaidButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            markPaidButton.setBorder(BorderFactory.createEmptyBorder(6, 14, 6, 14));
+            markPaidButton.addActionListener(e -> markAsPaid(dialog, parent, payment, onChanged));
+            content.add(markPaidButton);
+        } else if ("FAILED".equals(payment.getPaymentStatus())) {
+            JLabel note = new JLabel("<html><i>This payment attempt failed.</i></html>");
+            note.setFont(FontManager.bodyFont(Font.PLAIN, 12));
+            note.setForeground(AppTheme.STATUS_DANGER);
+            note.setAlignmentX(Component.LEFT_ALIGNMENT);
+            content.add(note);
+        } else if ("REFUNDED".equals(payment.getPaymentStatus())) {
+            JLabel note = new JLabel("<html><i>This payment has been refunded.</i></html>");
             note.setFont(FontManager.bodyFont(Font.PLAIN, 12));
             note.setForeground(AppTheme.TEXT_MUTED);
             note.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -51,6 +90,29 @@ public class PaymentDetailsDialog {
 
         dialog.setContentPane(content);
         dialog.setVisible(true);
+    }
+
+    // Same backend contract as before: flipping to PAID triggers
+    // PaymentService.closeTicketIfPaid() server-side automatically.
+    private static void markAsPaid(JDialog dialog, Component parent, Payment payment, Runnable onChanged) {
+        int confirm = JOptionPane.showConfirmDialog(dialog,
+                "Confirm that payment of R" + payment.getPaymentAmount().setScale(2, RoundingMode.HALF_UP)
+                        + " has been received in person?",
+                "Mark as Paid", JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        payment.setPaymentStatus("PAID");
+        BaseApiClient.ApiResult<Payment> result = ApiClientProvider.getInstance().payments().update(payment);
+
+        if (result.isSuccess()) {
+            dialog.dispose();
+            AppDialog.show(parent, "Payment Confirmed",
+                    "The payment has been marked as paid, and the ticket has been closed.", AppDialog.Type.SUCCESS);
+            if (onChanged != null) onChanged.run();
+        } else {
+            AppDialog.show(parent, "Unable to Update Payment",
+                    result.getMessage() != null ? result.getMessage() : "Something went wrong.", AppDialog.Type.ERROR);
+        }
     }
 
     private static String patientName(Payment payment) {

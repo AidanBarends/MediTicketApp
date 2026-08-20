@@ -1,4 +1,4 @@
-package za.ac.cput.ui.clinicstaff.admin.components;
+package za.ac.cput.ui.clinicstaff.components;
 
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;

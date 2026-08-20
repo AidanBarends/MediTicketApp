@@ -3,8 +3,8 @@ package za.ac.cput.ui.clinicstaff.admin.pages;
 import za.ac.cput.api.ApiClientProvider;
 import za.ac.cput.api.BaseApiClient;
 import za.ac.cput.model.domain.*;
-import za.ac.cput.ui.clinicstaff.admin.components.ActivityRow;
-import za.ac.cput.ui.clinicstaff.admin.components.SummaryCard;
+import za.ac.cput.ui.clinicstaff.components.ActivityRow;
+import za.ac.cput.ui.clinicstaff.components.SummaryCard;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
 
