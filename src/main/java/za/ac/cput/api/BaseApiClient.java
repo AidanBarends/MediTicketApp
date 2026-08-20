@@ -19,10 +19,7 @@ import java.util.List;
  */
 public class BaseApiClient {
 
-    private static final String BASE_URL = System.getProperty(
-            "api.base.url",
-            "https://mediticket2-production.up.railway.app/api"
-    );
+    private static final String BASE_URL = "http://localhost:8080/api";
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
