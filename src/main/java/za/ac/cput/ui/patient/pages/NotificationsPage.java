@@ -13,12 +13,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 
-/**
- * Read-only notification feed for patients. Notification has no read/unread
- * flag on the backend — notificationStatus (SENT/FAILED/PENDING) describes
- * delivery, not whether the patient has seen it — so this shows every
- * notification, newest first, with no "mark as read" concept.
- */
+
 public class NotificationsPage extends JPanel {
 
     private JPanel listContainer;
@@ -72,7 +67,7 @@ public class NotificationsPage extends JPanel {
         return panel;
     }
 
-    // ── Data loading ─────────────────────────────────────────────
+
 
     private void loadData() {
         int patientId = SessionManager.getInstance().getUserId();
@@ -150,11 +145,7 @@ public class NotificationsPage extends JPanel {
         return card;
     }
 
-    /**
-     * No dedicated "category" field exists on Notification, so this infers
-     * a sensible icon from which related object (appointment/ticket) is
-     * attached — purely a display nicety, not driven by real backend data.
-     */
+
     private String iconFor(Notification notification) {
         if (notification.getAppointment() != null) return "\uD83D\uDCC5"; // 📅
         if (notification.getTicket() != null) return "\uD83C\uDFAB";      // 🎫

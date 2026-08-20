@@ -149,11 +149,7 @@ public class ProfilePage extends JPanel {
         return button;
     }
 
-    /**
-     * Toggles editability for the fields patients are actually allowed to
-     * change (name, phone, emergency contact). Email/DOB/registration
-     * date stay locked regardless — handled separately in buildFormCard().
-     */
+
     private void setEditable(boolean editable) {
         firstNameField.getField().setEditable(editable);
         lastNameField.getField().setEditable(editable);
@@ -175,7 +171,7 @@ public class ProfilePage extends JPanel {
         cancelButton.setVisible(false);
     }
 
-    // ── Data loading ─────────────────────────────────────────────
+
 
     private void loadData() {
         int patientId = SessionManager.getInstance().getUserId();
@@ -204,8 +200,7 @@ public class ProfilePage extends JPanel {
             return;
         }
 
-        // patient.getName() is never null here — it came from a real
-        // record we just fetched — but guard anyway rather than assume.
+
         if (patient.getName() == null) {
             patient.setName(new za.ac.cput.model.domain.Name());
         }

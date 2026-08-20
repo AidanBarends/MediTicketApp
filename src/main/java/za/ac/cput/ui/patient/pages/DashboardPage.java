@@ -54,7 +54,7 @@ public class DashboardPage extends JPanel {
         loadData();
     }
 
-    // ── Greeting + quick actions ────────────────────────────────
+
 
     private JComponent buildGreeting() {
         JPanel panel = new JPanel();
@@ -65,9 +65,7 @@ public class DashboardPage extends JPanel {
         SessionManager session = SessionManager.getInstance();
         String firstName = extractFirstName(session.getFullName());
 
-        // The 👋 emoji has no glyph in our embedded Playfair/Inter fonts, so it's
-        // wrapped in its own HTML span with a system font-family — the rest of
-        // the greeting keeps using the real headline font via setFont() below.
+
         JLabel greeting = new JLabel(
                 "<html>" + greetingForTime() + ", " + firstName
                         + " <span style='font-family:" + Font.SANS_SERIF + ";'>\uD83D\uDC4B</span></html>"
@@ -101,9 +99,7 @@ public class DashboardPage extends JPanel {
     }
 
     private JButton quickActionButton(String emoji, String label, Color background, Color foreground) {
-        // Same font-fallback issue as the sidebar and greeting: the emoji is
-        // wrapped in its own HTML span using a system font-family, while the
-        // label text still renders in our real UI font via setFont() below.
+
         String html = "<html><span style='font-family:" + Font.SANS_SERIF + ";'>" + emoji + "</span> " + label + "</html>";
 
         JButton button = new JButton(html) {
@@ -144,7 +140,7 @@ public class DashboardPage extends JPanel {
         return fullName.split(" ")[0];
     }
 
-    // ── Summary cards ────────────────────────────────────────────
+
 
     private JComponent buildSummaryCards() {
         JPanel grid = new JPanel(new GridLayout(1, 4, AppTheme.SPACE_MD, 0));
@@ -164,7 +160,7 @@ public class DashboardPage extends JPanel {
         return grid;
     }
 
-    // ── Timeline + Next Appointment ─────────────────────────────
+
 
     private JComponent buildTwoColumnSection() {
         JPanel columns = new JPanel(new GridLayout(1, 2, AppTheme.SPACE_LG, 0));
@@ -233,7 +229,7 @@ public class DashboardPage extends JPanel {
         section.repaint();
     }
 
-    // ── Data loading ─────────────────────────────────────────────
+
 
     private void loadData() {
         int patientId = SessionManager.getInstance().getUserId();
@@ -257,9 +253,7 @@ public class DashboardPage extends JPanel {
         var notifResult = ApiClientProvider.getInstance().notifications().findByPatient(patientId);
         if (notifResult.isSuccess()) notificationCount = notifResult.getData().size();
 
-        // No findByPatient endpoint on PaymentApiClient yet — filtering
-        // client-side from getAll() as a stopgap. Worth adding a proper
-        // backend endpoint (e.g. GET /payments/patient/{id}) later.
+
         int outstandingPaymentCount = 0;
         var paymentResult = ApiClientProvider.getInstance().payments().getAll();
         if (paymentResult.isSuccess()) {

@@ -170,15 +170,7 @@ public class PatientSignupPanel extends JPanel {
         return tagline;
     }
 
-    /**
-     * Runs the signup HTTP call on a background thread via SwingWorker,
-     * instead of directly on the EDT. Previously this blocked the entire
-     * UI while waiting for the network — the window would appear frozen
-     * with zero visible feedback (worst against a cold-starting Railway
-     * backend, which can take several seconds to wake up). Disabling the
-     * button while a request is in flight also prevents duplicate clicks
-     * from queuing up and firing all at once. Mirrors LoginPanel.onSignIn().
-     */
+
     private void onCreateAccount() {
         String pwd = new String(password.getPassword());
         String confirmPwd = new String(confirmPassword.getPassword());

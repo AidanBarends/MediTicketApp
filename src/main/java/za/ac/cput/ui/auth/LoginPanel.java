@@ -22,12 +22,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
-/**
- * Single generic login screen shared by all four user roles (Patient,
- * Doctor, ClinicStaff/Nurse, ClinicStaff/Admin). Role is not chosen here —
- * it's determined after authentication by decoding the JWT (see JwtUtil),
- * and AppFrame is routed to the correct dashboard from there.
- */
+
 public class LoginPanel extends JPanel {
 
     private final AppFrame appFrame;
@@ -44,7 +39,7 @@ public class LoginPanel extends JPanel {
         add(buildFormSection());
     }
 
-    // ── Left: hero section ──────────────────────────────────────
+
 
     private JComponent buildHeroSection() {
         JPanel hero = new JPanel(new GridBagLayout()) {
@@ -83,7 +78,7 @@ public class LoginPanel extends JPanel {
         return hero;
     }
 
-    // ── Right: login form ───────────────────────────────────────
+
 
     private JComponent buildFormSection() {
         JPanel wrapper = new JPanel(new GridBagLayout());
@@ -145,12 +140,7 @@ public class LoginPanel extends JPanel {
         return wrapper;
     }
 
-    /**
-     * Builds a "<plain text> <teal link>" row, e.g. "New patient? Sign up".
-     * Returned as a single JLabel-hosting panel isn't ideal for click
-     * targeting on just the link half, so this uses two adjacent labels
-     * inside a left-aligned FlowLayout instead.
-     */
+
     private JLabel buildLinkRow(String prefix, String linkText, Runnable onClick) {
         JLabel combined = new JLabel(
                 "<html>" + prefix + " <span style='color:#0E7C86;font-weight:bold;'>" + linkText + "</span></html>"
@@ -166,17 +156,7 @@ public class LoginPanel extends JPanel {
         return combined;
     }
 
-    // ── Actions ──────────────────────────────────────────────────
 
-    /**
-     * Runs the login HTTP call on a background thread via SwingWorker,
-     * instead of directly on the EDT. Previously this blocked the entire
-     * UI while waiting for the network — the window would appear frozen
-     * with zero visible feedback, and repeated clicks during that freeze
-     * would queue up and fire all at once the moment the first call
-     * finally returned. Disabling the button while a request is in
-     * flight prevents that queuing entirely, on top of fixing the freeze.
-     */
     private void onSignIn() {
         String email = emailField.getText().trim();
         String password = new String(passwordField.getPassword());
@@ -240,7 +220,7 @@ public class LoginPanel extends JPanel {
 
         ApiClientProvider.getInstance().getBaseApiClient().setAuthToken(token);
 
-        // Fetch full name for the header, since AuthResponse doesn't carry it
+
         if ("CLINIC_STAFF".equals(session.getUserType())) {
             var staff = ApiClientProvider.getInstance().clinicStaff().findByEmail(session.getEmail());
             if (staff.isSuccess()) session.setFullName(staff.getData().getName().getFullName());
@@ -248,7 +228,7 @@ public class LoginPanel extends JPanel {
             var patient = ApiClientProvider.getInstance().patients().findByEmail(session.getEmail());
             if (patient.isSuccess()) session.setFullName(patient.getData().getName().getFullName());
         }
-        // (DOCTOR branch unchanged from earlier)
+
 
         if (session.isAdmin()) {
             AdminDashboard dashboard = new AdminDashboard(appFrame);

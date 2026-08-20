@@ -15,11 +15,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 
-/**
- * Read-only ticket list for patients — they can see what's happening with
- * their consultation tickets, but only doctors/staff progress the status
- * (via PatientTicketApiClient.progressStatus), so there's no action here.
- */
+
+
 public class TicketsPage extends JPanel {
 
     private JPanel listContainer;
@@ -73,7 +70,7 @@ public class TicketsPage extends JPanel {
         return panel;
     }
 
-    // ── Data loading ─────────────────────────────────────────────
+
 
     private void loadData() {
         int patientId = SessionManager.getInstance().getUserId();
@@ -94,8 +91,7 @@ public class TicketsPage extends JPanel {
             return;
         }
 
-        // Most recently created first, so the ticket you're most likely
-        // checking on (a recent one) is at the top without scrolling.
+
         List<PatientTicket> sorted = tickets.stream()
                 .sorted(Comparator.comparing(
                         (PatientTicket t) -> t.getTicketCreatedDate() != null ? t.getTicketCreatedDate() : java.time.LocalDateTime.MIN
@@ -121,7 +117,7 @@ public class TicketsPage extends JPanel {
         ));
         card.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        // ── Top row: description + status badge ──
+
         JPanel topRow = new JPanel(new BorderLayout(AppTheme.SPACE_MD, 0));
         topRow.setOpaque(false);
         topRow.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -135,7 +131,7 @@ public class TicketsPage extends JPanel {
         topRow.add(descLabel, BorderLayout.CENTER);
         topRow.add(new StatusBadge(ticket.getCurrentStatus()), BorderLayout.EAST);
 
-        // ── Created date + linked doctor (if any) ──
+
         String createdText = ticket.getTicketCreatedDate() != null
                 ? "Opened " + ticket.getTicketCreatedDate().format(DATE_FMT) : "Opened —";
         String doctorText = ticket.getAppointment() != null
@@ -153,7 +149,7 @@ public class TicketsPage extends JPanel {
         card.add(topRow);
         card.add(metaLabel);
 
-        // ── Status history, if the backend included any ──
+
         if (ticket.getStatusHistory() != null && !ticket.getStatusHistory().isEmpty()) {
             card.add(Box.createVerticalStrut(AppTheme.SPACE_SM));
             card.add(statusHistoryRow(ticket.getStatusHistory()));

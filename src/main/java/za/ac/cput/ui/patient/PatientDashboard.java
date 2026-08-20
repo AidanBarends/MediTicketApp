@@ -56,11 +56,7 @@ public class PatientDashboard extends JPanel {
         showPage(PAGE_HOME);
     }
 
-    /**
-     * All six pages are real now — DashboardPage, AppointmentsPage,
-     * TicketsPage, PaymentsPage, NotificationsPage, ProfilePage — each
-     * verified end to end against a real backend.
-     */
+
     private void registerPages() {
         pageContainer.add(new DashboardPage(), PAGE_HOME);
         pageContainer.add(new AppointmentsPage(), PAGE_APPOINTMENTS);

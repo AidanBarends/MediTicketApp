@@ -6,13 +6,7 @@ import za.ac.cput.ui.theme.FontManager;
 import javax.swing.*;
 import java.awt.*;
 
-/**
- * A small rounded "pill" showing a status string (e.g. CONFIRMED, PENDING,
- * IN_PROGRESS), colored via AppTheme.statusColor()/statusBackground() so
- * it stays visually consistent with every other status indicator in the
- * app. Text is auto-formatted from SCREAMING_SNAKE_CASE to Title Case
- * (e.g. "IN_PROGRESS" -> "In Progress") to match the Figma design.
- */
+
 public class StatusBadge extends JPanel {
 
     private final JLabel textLabel;
@@ -56,8 +50,7 @@ public class StatusBadge extends JPanel {
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setColor(backgroundColor);
-        // Fully round the height so it's a true "pill" shape, not just a
-        // rounded rectangle — arc = height means the ends are semicircles.
+
         g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
         g2.dispose();
         super.paintComponent(g);
