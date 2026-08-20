@@ -3,7 +3,7 @@ package za.ac.cput.ui.clinicstaff.admin.pages;
 import za.ac.cput.api.ApiClientProvider;
 import za.ac.cput.api.BaseApiClient;
 import za.ac.cput.model.domain.*;
-import za.ac.cput.ui.clinicstaff.admin.components.NotificationDetailsDialog;
+import za.ac.cput.ui.clinicstaff.components.NotificationDetailsDialog;
 import za.ac.cput.ui.theme.AppDialog;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;

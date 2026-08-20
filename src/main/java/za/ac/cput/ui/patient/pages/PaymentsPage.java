@@ -90,7 +90,8 @@ public class PaymentsPage extends JPanel {
         bar.setOpaque(false);
 
         String[][] filters = {
-                {"ALL", "All"}, {"PENDING", "Pending"}, {"PAID", "Paid"}
+                {"ALL", "All"}, {"PENDING", "Pending"}, {"PAID", "Paid"},
+                {"FAILED", "Failed"}, {"REFUNDED", "Refunded"}
         };
 
         for (String[] f : filters) {
@@ -146,10 +147,34 @@ public class PaymentsPage extends JPanel {
         if (payment == null) return;
 
         if ("PENDING".equals(payment.getPaymentStatus())) {
-            FakeCheckoutDialog.show(this, payment, this::loadData);
+            if ("EFT".equals(payment.getPaymentMethod())) {
+                FakeCheckoutDialog.show(this, payment, this::loadData);
+            } else {
+                JOptionPane.showMessageDialog(this,
+                        "This payment is set to be settled at the clinic by " +
+                                methodDisplayName(payment.getPaymentMethod()) + ".\n" +
+                                "Please visit reception to complete payment.",
+                        "Settle at Clinic", JOptionPane.INFORMATION_MESSAGE);
+            }
+        } else if ("FAILED".equals(payment.getPaymentStatus()) && "EFT".equals(payment.getPaymentMethod())) {
+            int retry = JOptionPane.showConfirmDialog(this,
+                    "This payment attempt failed. Would you like to try again?",
+                    "Payment Failed", JOptionPane.YES_NO_OPTION);
+            if (retry == JOptionPane.YES_OPTION) {
+                FakeCheckoutDialog.show(this, payment, this::loadData);
+            }
         }
-        // PAID/other statuses: no action for now — could add a read-only
-        // receipt dialog later if needed.
+        // PAID/REFUNDED: no action — could add a read-only receipt dialog later.
+    }
+
+    private String methodDisplayName(String method) {
+        if (method == null) return "the clinic";
+        return switch (method) {
+            case "CASH" -> "cash";
+            case "CARD" -> "card";
+            case "MEDICAL_AID" -> "medical aid";
+            default -> method;
+        };
     }
 
     // ── Data loading ──────────────────────────────────────────────

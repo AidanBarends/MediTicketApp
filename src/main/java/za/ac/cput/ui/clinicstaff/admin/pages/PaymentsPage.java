@@ -4,8 +4,8 @@ import za.ac.cput.api.ApiClientProvider;
 import za.ac.cput.api.BaseApiClient;
 import za.ac.cput.model.domain.Appointment;
 import za.ac.cput.model.domain.Payment;
-import za.ac.cput.ui.clinicstaff.admin.components.PaymentDetailsDialog;
-import za.ac.cput.ui.clinicstaff.admin.components.SummaryCard;
+import za.ac.cput.ui.clinicstaff.components.PaymentDetailsDialog;
+import za.ac.cput.ui.clinicstaff.components.SummaryCard;
 import za.ac.cput.ui.layout.RowClickHelper;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
@@ -19,10 +19,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Read-only for Admin/Nurse — monitoring only. Payment confirmation is now
- * entirely the patient's action on their own dashboard; staff can no
- * longer mark anything paid here. Row click opens a read-only details
- * dialog (PaymentDetailsDialog).
+ * Row click opens PaymentDetailsDialog, which is read-only for EFT
+ * payments (settled entirely by the patient) but exposes a "Mark as Paid"
+ * action for CASH, CARD, and MEDICAL_AID — those are collected in person
+ * by staff.
  */
 public class PaymentsPage extends JPanel {
 
@@ -178,7 +178,7 @@ public class PaymentsPage extends JPanel {
     private void onRowClicked(int paymentId) {
         Payment payment = findById(paymentId);
         if (payment != null) {
-            PaymentDetailsDialog.show(this, payment);
+            PaymentDetailsDialog.show(this, payment, this::loadData);
         }
     }
 
