@@ -6,7 +6,7 @@ import za.ac.cput.model.domain.ClinicStaff;
 import za.ac.cput.model.domain.Name;
 import za.ac.cput.session.SessionManager;
 import za.ac.cput.ui.auth.components.LabeledTextField;
-import za.ac.cput.ui.clinicstaff.admin.components.ChangePasswordDialog;
+import za.ac.cput.ui.clinicstaff.components.ChangePasswordDialog;
 import za.ac.cput.ui.theme.AppDialog;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.AvatarManager;

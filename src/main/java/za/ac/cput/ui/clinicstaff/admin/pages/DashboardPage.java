@@ -7,8 +7,8 @@ import za.ac.cput.model.domain.Appointment;
 import za.ac.cput.model.domain.ClinicStaff;
 import za.ac.cput.model.domain.Doctor;
 import za.ac.cput.session.SessionManager;
-import za.ac.cput.ui.clinicstaff.admin.components.ActivityRow;
-import za.ac.cput.ui.clinicstaff.admin.components.SummaryCard;
+import za.ac.cput.ui.clinicstaff.components.ActivityRow;
+import za.ac.cput.ui.clinicstaff.components.SummaryCard;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
 

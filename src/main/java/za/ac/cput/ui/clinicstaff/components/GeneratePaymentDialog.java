@@ -1,4 +1,4 @@
-package za.ac.cput.ui.clinicstaff.admin.components;
+package za.ac.cput.ui.clinicstaff.components;
 
 import za.ac.cput.api.ApiClientProvider;
 import za.ac.cput.api.BaseApiClient;
@@ -16,11 +16,12 @@ import java.math.RoundingMode;
 /**
  * Generates a PENDING payment request for a RESOLVED ticket. The payment
  * becomes visible on both the Admin/Nurse Payments page and the Patient's
- * Payments page from this point — the patient is the one who actually
- * pays; this dialog only creates the request. Payment method here is a
- * placeholder/expected value, not a final commitment — the patient may
- * pay differently; this just satisfies the required paymentMethod field
- * until a real patient-facing "Pay Now" flow exists.
+ * Payments page from this point.
+ *
+ * Payment method determines how settlement happens: EFT routes the
+ * patient through their own self-checkout (FakeCheckoutDialog); CASH,
+ * CARD, and MEDICAL_AID are settled in person at the clinic, so staff
+ * confirm those payments themselves once collected.
  */
 public class GeneratePaymentDialog {
 

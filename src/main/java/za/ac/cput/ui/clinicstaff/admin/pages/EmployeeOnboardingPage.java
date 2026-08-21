@@ -4,7 +4,7 @@ import za.ac.cput.api.ApiClientProvider;
 import za.ac.cput.api.BaseApiClient;
 import za.ac.cput.model.auth.EmployeeAccessRequest;
 import za.ac.cput.session.SessionManager;
-import za.ac.cput.ui.clinicstaff.admin.components.InviteEmployeeDialog;
+import za.ac.cput.ui.clinicstaff.components.InviteEmployeeDialog;
 import za.ac.cput.ui.theme.AppDialog;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
