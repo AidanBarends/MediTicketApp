@@ -40,7 +40,7 @@ public class AdminDashboard extends JPanel {
                 new NavItem(PAGE_HOME, "\uD83C\uDFE0", "Home"),
                 new NavItem(PAGE_APPOINTMENTS, "\uD83D\uDCC5", "Appointments"),
                 new NavItem(PAGE_STAFF, "\uD83D\uDC65", "Staff"),
-                new NavItem(PAGE_PATIENTS, "\uD83E\uDD1D", "Patients"),
+                new NavItem(PAGE_PATIENTS, "\uD83D\uDECC", "Patients"),
                 new NavItem(PAGE_ONBOARDING, "\uD83D\uDCCB", "Onboarding"),
                 new NavItem(PAGE_TICKETS, "\uD83C\uDFAB", "Tickets"),
                 new NavItem(PAGE_REPORTS, "\uD83D\uDCCA", "Reports"),
