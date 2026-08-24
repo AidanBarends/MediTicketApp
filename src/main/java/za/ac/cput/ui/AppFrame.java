@@ -80,7 +80,6 @@ public class AppFrame extends JFrame {
         contentContainer.add(new EmployeeAccessRequestPanel(this), SCREEN_ACCESS_REQUEST);
         contentContainer.add(new RequestSubmittedPanel(this), SCREEN_REQUEST_SUBMITTED);
         contentContainer.add(new VerifyInviteCodePanel(this), SCREEN_VERIFY_INVITE);
-        contentContainer.add(signupVerifyCodePanel, SCREEN_SIGNUP_VERIFY);
 
         doctorSignupPanel = new DoctorSignupPanel(this);
         clinicStaffSignupPanel = new ClinicStaffSignupPanel(this);
@@ -95,6 +94,7 @@ public class AppFrame extends JFrame {
         contentContainer.add(newPasswordPanel, SCREEN_NEW_PASSWORD);
 
         signupVerifyCodePanel = new SignupVerifyCodePanel(this);
+        contentContainer.add(signupVerifyCodePanel, SCREEN_SIGNUP_VERIFY);
     }
 
     /**
