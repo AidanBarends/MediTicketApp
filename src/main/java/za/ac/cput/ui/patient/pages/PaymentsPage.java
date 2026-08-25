@@ -17,6 +17,7 @@ import za.ac.cput.session.SessionManager;
 import za.ac.cput.ui.patient.components.FakeCheckoutDialog;
 import za.ac.cput.ui.patient.components.MedicalAidDialog;
 import za.ac.cput.ui.layout.RowClickHelper;
+import za.ac.cput.ui.patient.components.PaymentReceiptDialog;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
 
@@ -160,9 +161,6 @@ public class PaymentsPage extends JPanel {
             if ("EFT".equals(payment.getPaymentMethod())) {
                 FakeCheckoutDialog.show(this, payment, this::loadData);
             } else if ("MEDICAL_AID".equals(payment.getPaymentMethod())) {
-                // Submitting a claim does not settle the payment — it stays
-                // PENDING until the scheme authorises it and staff confirm,
-                // so there is nothing to reload afterwards.
                 MedicalAidDialog.show(this, payment);
             } else {
                 JOptionPane.showMessageDialog(this,
@@ -178,8 +176,9 @@ public class PaymentsPage extends JPanel {
             if (retry == JOptionPane.YES_OPTION) {
                 FakeCheckoutDialog.show(this, payment, this::loadData);
             }
+        } else if ("PAID".equals(payment.getPaymentStatus()) || "REFUNDED".equals(payment.getPaymentStatus())) {
+            PaymentReceiptDialog.show(this, payment);
         }
-        // PAID/REFUNDED: no action — could add a read-only receipt dialog later.
     }
 
     private String methodDisplayName(String method) {
