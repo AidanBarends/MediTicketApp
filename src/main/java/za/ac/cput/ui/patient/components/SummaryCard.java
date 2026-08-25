@@ -6,15 +6,15 @@ import za.ac.cput.ui.theme.FontManager;
 import javax.swing.*;
 import java.awt.*;
 
-public class SummaryCard extends JPanel {
+public class SummaryCard extends ElevatedCard {
 
     private final JLabel valueLabel;
 
     public SummaryCard(String title, String initialValue, Color accent) {
+        super(AppTheme.RADIUS_MD);
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-        setBackground(AppTheme.SURFACE);
         setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(AppTheme.BORDER, 1, true),
+                getBorder(),
                 BorderFactory.createEmptyBorder(AppTheme.SPACE_MD, AppTheme.SPACE_MD, AppTheme.SPACE_MD, AppTheme.SPACE_MD)
         ));
 

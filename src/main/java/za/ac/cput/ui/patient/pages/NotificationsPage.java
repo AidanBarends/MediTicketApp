@@ -4,19 +4,27 @@ import za.ac.cput.api.ApiClientProvider;
 import za.ac.cput.api.BaseApiClient;
 import za.ac.cput.model.domain.Notification;
 import za.ac.cput.session.SessionManager;
+import za.ac.cput.ui.patient.components.ElevatedCard;
+import za.ac.cput.ui.patient.components.IconBadge;
+import za.ac.cput.ui.patient.components.StatusBadge;
+import za.ac.cput.ui.patient.components.WrappingLabel;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.FontManager;
 
 import javax.swing.*;
 import java.awt.*;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 
 public class NotificationsPage extends JPanel {
 
     private JPanel listContainer;
+    private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("h:mm a");
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a");
 
     public NotificationsPage() {
@@ -35,6 +43,7 @@ public class NotificationsPage extends JPanel {
         listContainer.setLayout(new BoxLayout(listContainer, BoxLayout.Y_AXIS));
         listContainer.setOpaque(false);
         listContainer.setAlignmentX(Component.LEFT_ALIGNMENT);
+        listContainer.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
         content.add(listContainer);
 
         JScrollPane scroll = new JScrollPane(content);
@@ -94,49 +103,99 @@ public class NotificationsPage extends JPanel {
                 ).reversed())
                 .toList();
 
-        for (Notification notification : sorted) {
-            listContainer.add(notificationCard(notification));
+        // Group into Today / Yesterday / Earlier so a long history doesn't
+        // read as one undifferentiated wall of cards.
+        Map<String, List<Notification>> groups = new LinkedHashMap<>();
+        groups.put("Today", new java.util.ArrayList<>());
+        groups.put("Yesterday", new java.util.ArrayList<>());
+        groups.put("Earlier", new java.util.ArrayList<>());
+
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+        for (Notification n : sorted) {
+            LocalDate d = n.getNotificationDate() != null ? n.getNotificationDate().toLocalDate() : null;
+            if (d != null && d.isEqual(today)) {
+                groups.get("Today").add(n);
+            } else if (d != null && d.isEqual(yesterday)) {
+                groups.get("Yesterday").add(n);
+            } else {
+                groups.get("Earlier").add(n);
+            }
+        }
+
+        boolean firstGroup = true;
+        for (Map.Entry<String, List<Notification>> group : groups.entrySet()) {
+            if (group.getValue().isEmpty()) continue;
+
+            if (!firstGroup) {
+                listContainer.add(Box.createVerticalStrut(AppTheme.SPACE_MD));
+            }
+            firstGroup = false;
+
+            listContainer.add(groupHeader(group.getKey()));
             listContainer.add(Box.createVerticalStrut(AppTheme.SPACE_SM));
+
+            for (Notification notification : group.getValue()) {
+                listContainer.add(notificationCard(notification));
+                listContainer.add(Box.createVerticalStrut(AppTheme.SPACE_SM));
+            }
         }
 
         listContainer.revalidate();
         listContainer.repaint();
     }
 
+    private JComponent groupHeader(String label) {
+        JLabel header = new JLabel(label.toUpperCase());
+        header.setFont(FontManager.bodyFont(Font.BOLD, 11));
+        header.setForeground(AppTheme.TEXT_MUTED);
+        header.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return header;
+    }
+
     private JComponent notificationCard(Notification notification) {
-        JPanel card = new JPanel(new BorderLayout(AppTheme.SPACE_MD, 0));
-        card.setBackground(AppTheme.SURFACE);
+        ElevatedCard card = new ElevatedCard(AppTheme.RADIUS_MD);
+        card.setLayout(new BorderLayout(AppTheme.SPACE_MD, 0));
+        card.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
         card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(AppTheme.BORDER, 1, true),
+                card.getBorder(),
                 BorderFactory.createEmptyBorder(AppTheme.SPACE_MD, AppTheme.SPACE_MD, AppTheme.SPACE_MD, AppTheme.SPACE_MD)
         ));
-        card.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel icon = new JLabel(iconFor(notification));
-        icon.setFont(FontManager.bodyFont(Font.PLAIN, 20));
-        icon.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, AppTheme.SPACE_SM));
+        IconBadge icon = new IconBadge(iconFor(notification), colorFor(notification));
 
         JPanel textStack = new JPanel();
         textStack.setLayout(new BoxLayout(textStack, BoxLayout.Y_AXIS));
         textStack.setOpaque(false);
 
+        JPanel topRow = new JPanel(new BorderLayout(AppTheme.SPACE_SM, 0));
+        topRow.setOpaque(false);
+        topRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        topRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
+
+        JLabel typeLabel = new JLabel(categoryFor(notification));
+        typeLabel.setFont(FontManager.bodyFont(Font.BOLD, 11));
+        typeLabel.setForeground(AppTheme.TEXT_MUTED);
+        topRow.add(typeLabel, BorderLayout.WEST);
+        topRow.add(new StatusBadge(notification.getNotificationStatus()), BorderLayout.EAST);
+
         String message = notification.getNotificationMessage() != null && !notification.getNotificationMessage().isBlank()
                 ? notification.getNotificationMessage() : "No message content";
-        JLabel messageLabel = new JLabel("<html><div style='width:400px;'>" + message + "</div></html>");
-        messageLabel.setFont(FontManager.bodyFont(Font.PLAIN, 13));
-        messageLabel.setForeground(AppTheme.TEXT_PRIMARY);
-        messageLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        WrappingLabel messageLabel = new WrappingLabel(message, FontManager.bodyFont(Font.PLAIN, 13), AppTheme.TEXT_PRIMARY);
+        messageLabel.setBorder(BorderFactory.createEmptyBorder(AppTheme.SPACE_XS, 0, AppTheme.SPACE_XS, 0));
 
         String dateText = notification.getNotificationDate() != null
-                ? notification.getNotificationDate().format(DATE_FMT) : "—";
-        String typeText = notification.getNotificationType() != null ? " · " + notification.getNotificationType() : "";
+                ? notification.getNotificationDate().format(DATE_FMT) : "\u2014";
+        String channelText = notification.getNotificationType() != null
+                ? "  \u2022  Sent via " + notification.getNotificationType() : "";
 
-        JLabel metaLabel = new JLabel(dateText + typeText);
+        JLabel metaLabel = new JLabel(dateText + channelText);
         metaLabel.setFont(FontManager.bodyFont(Font.PLAIN, 11));
         metaLabel.setForeground(AppTheme.TEXT_MUTED);
         metaLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        metaLabel.setBorder(BorderFactory.createEmptyBorder(4, 0, 0, 0));
 
+        textStack.add(topRow);
         textStack.add(messageLabel);
         textStack.add(metaLabel);
 
@@ -145,6 +204,11 @@ public class NotificationsPage extends JPanel {
         return card;
     }
 
+    private String categoryFor(Notification notification) {
+        if (notification.getAppointment() != null) return "APPOINTMENT";
+        if (notification.getTicket() != null) return "TICKET";
+        return "GENERAL";
+    }
 
     private String iconFor(Notification notification) {
         if (notification.getAppointment() != null) return "\uD83D\uDCC5"; // 📅
@@ -152,19 +216,40 @@ public class NotificationsPage extends JPanel {
         return "\uD83D\uDD14";                                            // 🔔
     }
 
+    private Color colorFor(Notification notification) {
+        if (notification.getAppointment() != null) return AppTheme.PRIMARY_LIGHT;
+        if (notification.getTicket() != null) return AppTheme.STATUS_INFO_BG;
+        return AppTheme.STATUS_NEUTRAL_BG;
+    }
+
     private JComponent emptyState() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setOpaque(false);
-        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.setBorder(BorderFactory.createEmptyBorder(AppTheme.SPACE_XL, 0, 0, 0));
+        ElevatedCard card = new ElevatedCard(AppTheme.RADIUS_MD);
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        card.setBorder(BorderFactory.createCompoundBorder(
+                card.getBorder(),
+                BorderFactory.createEmptyBorder(AppTheme.SPACE_XL, AppTheme.SPACE_LG, AppTheme.SPACE_XL, AppTheme.SPACE_LG)
+        ));
 
-        JLabel label = new JLabel("No notifications yet.");
-        label.setFont(FontManager.bodyFont(Font.PLAIN, 14));
-        label.setForeground(AppTheme.TEXT_MUTED);
+        JLabel icon = new JLabel("\uD83D\uDD14");
+        icon.setFont(FontManager.bodyFont(Font.PLAIN, 28));
+        icon.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel label = new JLabel("No notifications yet");
+        label.setFont(FontManager.bodyFont(Font.BOLD, 15));
+        label.setForeground(AppTheme.TEXT_PRIMARY);
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        label.setBorder(BorderFactory.createEmptyBorder(AppTheme.SPACE_SM, 0, AppTheme.SPACE_XS, 0));
 
-        panel.add(label);
-        return panel;
+        JLabel sub = new JLabel("You'll see updates about appointments, tickets, and payments here.");
+        sub.setFont(FontManager.bodyFont(Font.PLAIN, 13));
+        sub.setForeground(AppTheme.TEXT_MUTED);
+        sub.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        card.add(icon);
+        card.add(label);
+        card.add(sub);
+        return card;
     }
 }
