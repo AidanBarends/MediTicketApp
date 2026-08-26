@@ -35,6 +35,9 @@ public class NurseDashboard extends JPanel {
     private final CardLayout pageLayout = new CardLayout();
     private final JPanel pageContainer = new JPanel(pageLayout);
 
+    private Sidebar sidebar;
+    private TopHeader topHeader;
+
     private static final String PAGE_HOME = "HOME";
     private static final String PAGE_APPOINTMENTS = "APPOINTMENTS";
     private static final String PAGE_PATIENTS = "PATIENTS";
@@ -58,13 +61,20 @@ public class NurseDashboard extends JPanel {
                 new NavItem(PAGE_PROFILE, "\uD83D\uDC64", "Profile")
         );
 
-        Sidebar sidebar = new Sidebar(navItems, PAGE_HOME, this::showPage, this::onLogout);
+        sidebar = new Sidebar(navItems, PAGE_HOME, this::showPage, this::onLogout);
+
+        // Header must exist before registerPages(), since ProfilePage needs
+        // topHeader::refreshProfile to notify it of name/avatar changes.
+        topHeader = new TopHeader(() -> {
+            sidebar.select(PAGE_PROFILE);
+            showPage(PAGE_PROFILE);
+        });
 
         registerPages();
 
         JPanel rightSide = new JPanel(new BorderLayout());
         rightSide.setBackground(AppTheme.BACKGROUND);
-        rightSide.add(new TopHeader(), BorderLayout.NORTH);
+        rightSide.add(topHeader, BorderLayout.NORTH);
         rightSide.add(pageContainer, BorderLayout.CENTER);
 
         add(sidebar, BorderLayout.WEST);
