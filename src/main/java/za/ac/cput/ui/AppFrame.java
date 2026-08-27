@@ -1,7 +1,6 @@
 package za.ac.cput.ui;
 
 import za.ac.cput.ui.auth.*;
-import za.ac.cput.ui.auth.*;
 import za.ac.cput.ui.theme.AppTheme;
 import za.ac.cput.ui.theme.ImageManager;
 
@@ -36,6 +35,7 @@ public class AppFrame extends JFrame {
     public static final String SCREEN_DOCTOR_DASHBOARD = "DOCTOR_DASHBOARD";
     public static final String SCREEN_PATIENT_DASHBOARD = "PATIENT_DASHBOARD";
     public static final String SCREEN_NURSE_DASHBOARD = "NURSE_DASHBOARD";
+    public static final String SCREEN_SIGNUP_VERIFY = "SIGNUP_VERIFY";
 
     // Remaining role dashboards get added here as those screens are built.
 
@@ -47,6 +47,7 @@ public class AppFrame extends JFrame {
 
     private VerifyResetCodePanel verifyResetCodePanel;
     private NewPasswordPanel newPasswordPanel;
+    private SignupVerifyCodePanel signupVerifyCodePanel;
 
     public AppFrame() {
         super("MediTicket");
@@ -89,9 +90,11 @@ public class AppFrame extends JFrame {
         contentContainer.add(new ForgotPasswordPanel(this), SCREEN_FORGOT_PASSWORD);
         verifyResetCodePanel = new VerifyResetCodePanel(this);
         contentContainer.add(verifyResetCodePanel, SCREEN_VERIFY_RESET_CODE);
-        contentContainer.add(new NewPasswordPanel(this), SCREEN_NEW_PASSWORD);
         newPasswordPanel = new NewPasswordPanel(this);
         contentContainer.add(newPasswordPanel, SCREEN_NEW_PASSWORD);
+
+        signupVerifyCodePanel = new SignupVerifyCodePanel(this);
+        contentContainer.add(signupVerifyCodePanel, SCREEN_SIGNUP_VERIFY);
     }
 
     /**
@@ -107,6 +110,7 @@ public class AppFrame extends JFrame {
     public ClinicStaffSignupPanel getClinicStaffSignupPanel() { return clinicStaffSignupPanel; }
     public VerifyResetCodePanel getVerifyResetCodePanel() { return verifyResetCodePanel; }
     public NewPasswordPanel getNewPasswordPanel() { return newPasswordPanel; }
+    public SignupVerifyCodePanel getSignupVerifyCodePanel() { return signupVerifyCodePanel; }
 
     /**
      * Registers a screen built after construction (e.g. a dashboard that
