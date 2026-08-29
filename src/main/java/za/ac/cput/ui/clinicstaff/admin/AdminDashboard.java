@@ -54,8 +54,7 @@ public class AdminDashboard extends JPanel {
 
         sidebar = new Sidebar(navItems, PAGE_HOME, this::showPage, this::onLogout);
 
-        // Header must exist before registerPages(), since ProfilePage needs
-        // topHeader::refreshProfile to notify it of name/avatar changes.
+
         topHeader = new TopHeader(() -> {
             sidebar.select(PAGE_PROFILE);
             showPage(PAGE_PROFILE);

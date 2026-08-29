@@ -19,15 +19,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Patient directory for admins — the counterpart to StaffPage, but for the
- * patient user base. Row-click pattern: clicking anywhere on a row opens
- * PatientDetailsDialog, which owns the Activate/Deactivate and Delete
- * actions (backend cascades the delete through appointments/tickets/
- * notifications/payments — see PatientService.delete() on the backend).
- * "Clear Inactive Patients" bulk-deletes every currently-INACTIVE patient
- * in one action, since that's the main cleanup use case admins asked for.
- */
+
 public class PatientsPage extends JPanel {
 
     private SummaryCard totalCard, activeCard, newThisMonthCard;
@@ -183,7 +175,6 @@ public class PatientsPage extends JPanel {
     }
 
     private JComponent buildTable() {
-        // ID column stays in the model for RowClickHelper, hidden from view.
         String[] columns = {"Name", "Email", "Phone", "Date Registered", "Status", "ID"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
@@ -216,7 +207,6 @@ public class PatientsPage extends JPanel {
         PatientDetailsDialog.show(this, patient, this::loadData);
     }
 
-    // ── Data loading ──────────────────────────────────────────────
 
     private void loadData() {
         BaseApiClient.ApiResult<List<Patient>> result = ApiClientProvider.getInstance().patients().getAll();
@@ -279,7 +269,6 @@ public class PatientsPage extends JPanel {
         return allPatients.stream().filter(p -> p.getUserId() == patientId).findFirst().orElse(null);
     }
 
-    // ── Clear Inactive Patients (bulk) ──────────────────────────
 
     private void onClearInactive() {
         List<Patient> inactive = allPatients.stream()
