@@ -22,14 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * The doctor's own patient roster — derived from findByDoctor(doctorId)
- * appointments rather than a dedicated "patients of this doctor" endpoint
- * (none exists server-side), deduplicated by patient userId so someone
- * with 5 appointments only shows up once. Row-click opens a read-only
- * detail dialog specific to this package (not clinicstaff's, which owns
- * Activate/Deactivate/Delete — admin-only actions a doctor shouldn't see).
- */
+
 public class PatientsPage extends JPanel {
 
     private SummaryCard totalPatientsCard, appointmentsThisMonthCard;

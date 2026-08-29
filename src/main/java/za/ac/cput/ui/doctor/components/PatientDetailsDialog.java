@@ -7,12 +7,7 @@ import za.ac.cput.ui.theme.FontManager;
 import javax.swing.*;
 import java.awt.*;
 
-/**
- * Read-only patient view for the doctor's Patients page. Deliberately a
- * separate class from clinicstaff's PatientDetailsDialog rather than a
- * reuse of it — that dialog owns Activate/Deactivate and Delete, which
- * are admin-only actions a doctor has no business triggering from here.
- */
+
 public class PatientDetailsDialog {
 
     public static void show(Component parent, Patient patient) {

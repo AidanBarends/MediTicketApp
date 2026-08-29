@@ -17,14 +17,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Read-only view of the doctor's own appointment schedule. No
- * findByDoctor-with-status-filter endpoint exists, so this loads
- * findByDoctor(doctorId) once and filters client-side — same pattern
- * TicketsPage already uses for this role. Row-click opens the read-only
- * detail dialog; no Approve/Reject here since that's a staff-side action
- * (AppointmentController#approve requires a staffId).
- */
+
 public class AppointmentsPage extends JPanel {
 
     private SummaryCard pendingCard, confirmedCard, completedCard;
@@ -136,7 +129,6 @@ public class AppointmentsPage extends JPanel {
     }
 
     private JComponent buildTable() {
-        // ID column stays in the model for RowClickHelper, hidden from view.
         String[] columns = {"Patient", "Date", "Time", "Reason", "Status", "ID"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
@@ -171,7 +163,6 @@ public class AppointmentsPage extends JPanel {
         AppointmentDetailsDialog.show(this, appointment);
     }
 
-    // ── Data loading ──────────────────────────────────────────────
 
     private void loadData() {
         int doctorId = SessionManager.getInstance().getUserId();
