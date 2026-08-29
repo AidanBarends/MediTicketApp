@@ -71,7 +71,7 @@ public class DoctorDashboard extends JPanel {
         pageContainer.add(new TicketsPage(), PAGE_TICKETS);
         pageContainer.add(new PatientsPage(), PAGE_PATIENTS);
         pageContainer.add(new NotificationsPage(), PAGE_NOTIFICATIONS);
-        pageContainer.add(new ProfilePage(), PAGE_PROFILE);
+        pageContainer.add(new ProfilePage(topHeader::refreshProfile), PAGE_PROFILE);
     }
 
     private void showPage(String key) {
