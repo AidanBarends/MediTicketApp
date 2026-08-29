@@ -126,7 +126,6 @@ public class AppointmentsPage extends JPanel {
     }
 
     private JComponent buildTable() {
-        // ID column stays in the model for RowClickHelper, hidden from view.
         String[] columns = {"Doctor", "Date", "Time", "Status", "Reason", "ID"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
